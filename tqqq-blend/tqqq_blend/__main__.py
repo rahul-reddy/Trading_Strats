@@ -8,6 +8,7 @@
 
 Broker profiles: python -m tqqq_blend --config config.ibkr-paper.toml <command>
 """
+
 from __future__ import annotations
 
 import argparse
@@ -40,14 +41,18 @@ def main():
 
     cfg = load_config(args.config)
     Path(cfg.state_dir).mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
-                        handlers=[logging.StreamHandler(), logging.FileHandler(Path(cfg.state_dir) / "tqqq_blend.log")])
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        handlers=[logging.StreamHandler(), logging.FileHandler(Path(cfg.state_dir) / "tqqq_blend.log")],
+    )
     pd.set_option("display.width", 200)
     pd.set_option("display.max_columns", 20)
     pd.set_option("display.float_format", "{:.3f}".format)
 
     if args.cmd == "backtest":
         from .backtest import annual_returns, backtest, validate_synthetic
+
         table, curves, sig, res = backtest(cfg.strategy, args.start, args.cost_bps, args.refresh)
         print(f"\nBacktest from {args.start}, {args.cost_bps} bps per trade, signal at close t -> held t+1\n")
         print(table.to_string())
@@ -55,8 +60,10 @@ def main():
         yearly.index = yearly.index.year
         print("\nAnnual returns\n" + yearly.to_string())
         v = validate_synthetic()
-        print(f"\nSynthetic vs real TQQQ since 2010: daily corr {v['daily_corr']:.4f}, "
-              f"CAGR real {v['real_cagr']:.1%} vs synthetic {v['synthetic_cagr']:.1%}")
+        print(
+            f"\nSynthetic vs real TQQQ since 2010: daily corr {v['daily_corr']:.4f}, "
+            f"CAGR real {v['real_cagr']:.1%} vs synthetic {v['synthetic_cagr']:.1%}"
+        )
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
         table.to_csv(out / "summary.csv")
@@ -67,37 +74,62 @@ def main():
     elif args.cmd == "signal":
         from .data import daily_bars
         from .strategy import compute_signals
+
         sig = compute_signals(daily_bars(cfg.strategy.signal_symbol, refresh=True), cfg.strategy)
-        cols = ["close", "sma_fast", "sma_slow", "ext", "rsi_mr", "dist_days", "sell_flags",
-                "trend", "mr", "vibha", "vibha_event", "vol_scale", "net", "w_long", "w_short"]
+        cols = [
+            "close",
+            "sma_fast",
+            "sma_slow",
+            "ext",
+            "rsi_mr",
+            "dist_days",
+            "sell_flags",
+            "trend",
+            "mr",
+            "vibha",
+            "vibha_event",
+            "vol_scale",
+            "net",
+            "w_long",
+            "w_short",
+        ]
         print(sig[cols].tail(args.days).to_string())
 
     elif args.cmd == "run":
         if args.broker:
             cfg.broker.name = args.broker
         from .runner import run_once
+
         print(json.dumps(run_once(cfg, live=args.live, force=args.force), indent=2, default=str))
 
     elif args.cmd == "ibkr-check":
         from .brokers.ibkr import IBKRBroker
+
         b = cfg.broker
-        print(f"Connecting read-only to {b.ibkr_host}:{b.ibkr_port}, expecting a {b.ibkr_account_type} account "
-              f"(config {args.config}, state_dir {cfg.state_dir})")
+        print(
+            f"Connecting read-only to {b.ibkr_host}:{b.ibkr_port}, expecting a {b.ibkr_account_type} account "
+            f"(config {args.config}, state_dir {cfg.state_dir})"
+        )
         broker = IBKRBroker(cfg)
         broker.connect(readonly=True, client_id=b.ibkr_client_id + 100)  # never collides with a scheduled run
         try:
             info = broker.describe()
             if b.quote_source == "finviz":
                 from .quotes import get_prices
-                info["quotes_used_by_run"] = dict(zip(("prices", "source"), get_prices(cfg, broker, list(info["quotes"]))))
+
+                prices, source = get_prices(cfg, broker, list(info["quotes"]))
+                info["quotes_used_by_run"] = {"prices": prices, "source": source}
             print(json.dumps(info, indent=2, default=str))
-            print(f"\nConnected. Orders for this profile are {'ENABLED' if b.live_trading_enabled else 'disabled'} "
-                  f"(live_trading_enabled = {str(b.live_trading_enabled).lower()}).")
+            print(
+                f"\nConnected. Orders for this profile are {'ENABLED' if b.live_trading_enabled else 'disabled'} "
+                f"(live_trading_enabled = {str(b.live_trading_enabled).lower()})."
+            )
         finally:
             broker.disconnect()
 
     elif args.cmd == "schwab-login":
         from .brokers.schwab import SchwabBroker
+
         SchwabBroker(cfg).connect(interactive=True)
         print("Schwab token saved to", cfg.broker.schwab_token_path)
 

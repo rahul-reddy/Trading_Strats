@@ -4,6 +4,7 @@ Finviz Elite quotes are real time, which matters for an IBKR paper account witho
 subscription (its quotes are 15 minutes delayed). The token comes from an environment variable,
 never from the config file. If Finviz fails, the broker's quote is used and the run records that.
 """
+
 from __future__ import annotations
 
 import csv

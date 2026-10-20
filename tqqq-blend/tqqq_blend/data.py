@@ -1,4 +1,5 @@
 """Market data via yfinance (free, end-of-day). Cached to state/cache to avoid re-downloading."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -25,7 +26,7 @@ def daily_bars(symbol: str, start: str = "1990-01-01", refresh: bool = False) ->
     return df[df.index >= pd.Timestamp(start)]
 
 
-def risk_free_daily(index: pd.DatetimeIndex, refresh: bool = False) -> pd.Series:
+def risk_free_daily(index: pd.Index, refresh: bool = False) -> pd.Series:
     """Daily T-bill return from ^IRX (13-week yield, percent)."""
     irx = daily_bars("^IRX", refresh=refresh)["close"]
     rate = irx.reindex(index).ffill().bfill().fillna(2.0) / 100

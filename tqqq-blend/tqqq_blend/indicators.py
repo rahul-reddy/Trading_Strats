@@ -1,4 +1,5 @@
 """Plain pandas/numpy indicators. Everything is computed on the daily signal series (QQQ)."""
+
 import numpy as np
 import pandas as pd
 

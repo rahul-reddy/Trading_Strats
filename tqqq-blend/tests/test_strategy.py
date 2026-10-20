@@ -12,8 +12,10 @@ def bars(closes, vols=None):
     closes = np.asarray(closes, float)
     idx = pd.bdate_range("2015-01-02", periods=len(closes))
     vols = np.full(len(closes), 1e6) if vols is None else np.asarray(vols, float)
-    return pd.DataFrame({"open": closes * 0.998, "high": closes * 1.005, "low": closes * 0.995,
-                         "close": closes, "volume": vols}, index=idx)
+    return pd.DataFrame(
+        {"open": closes * 0.998, "high": closes * 1.005, "low": closes * 0.995, "close": closes, "volume": vols},
+        index=idx,
+    )
 
 
 def test_steady_uptrend_is_long_never_short():
@@ -56,7 +58,7 @@ def test_backtest_flat_signal_earns_cash_only():
     sig["w_short"] = 0.0
     rets = synthetic_leveraged(b, pd.Series(0.0001, index=b.index))
     eq = run(sig, rets, band=0.1)["equity"]
-    assert eq.iloc[-1] == pytest.approx(1.0001 ** 299)
+    assert eq.iloc[-1] == pytest.approx(1.0001**299)
 
 
 def test_plan_orders_sells_first_and_respects_band():
@@ -69,7 +71,7 @@ def test_plan_orders_sells_first_and_respects_band():
 
 def test_vol_target_scales_long_only_when_volatile():
     rng = np.random.default_rng(2)
-    calm = 100 * np.exp(np.cumsum(rng.normal(0.0008, 0.004, 400)))   # ~6% annualized vol
+    calm = 100 * np.exp(np.cumsum(rng.normal(0.0008, 0.004, 400)))  # ~6% annualized vol
     wild = calm[-1] * np.exp(np.cumsum(rng.normal(0.002, 0.04, 60)))  # ~60% annualized vol
     b = bars(np.concatenate([calm, wild]))
     on, off = compute_signals(b, StrategyConfig()), compute_signals(b, StrategyConfig(vol_target=0))

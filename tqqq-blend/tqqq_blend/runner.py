@@ -1,12 +1,13 @@
 """The daily near-close process.
 
-  1. Gate: trading day? within the [min, max] minutes-to-close window? kill switch absent?
-  2. Signal: QQQ history + live price -> blended target weights for TQQQ / SQQQ.
-  3. Risk: data sanity, drawdown breaker, order-size cap.
-  4. Plan: diff target shares vs broker positions, skip changes inside the rebalance band.
-  5. Execute (only with --live AND broker.live_trading_enabled): sells first, then buys.
-  6. Log: state/trades.csv, state/runs.jsonl, state/state.json (equity peak).
+1. Gate: trading day? within the [min, max] minutes-to-close window? kill switch absent?
+2. Signal: QQQ history + live price -> blended target weights for TQQQ / SQQQ.
+3. Risk: data sanity, drawdown breaker, order-size cap.
+4. Plan: diff target shares vs broker positions, skip changes inside the rebalance band.
+5. Execute (only with --live AND broker.live_trading_enabled): sells first, then buys.
+6. Log: state/trades.csv, state/runs.jsonl, state/state.json (equity peak).
 """
+
 from __future__ import annotations
 
 import csv
@@ -41,8 +42,14 @@ def minutes_to_close(now_utc: pd.Timestamp | None = None) -> float | None:
     return (close - now_utc).total_seconds() / 60
 
 
-def plan_orders(targets: dict[str, float], positions: dict[str, int], prices: dict[str, float],
-                capital: float, band: float, order_type: str) -> list[Order]:
+def plan_orders(
+    targets: dict[str, float],
+    positions: dict[str, int],
+    prices: dict[str, float],
+    capital: float,
+    band: float,
+    order_type: str,
+) -> list[Order]:
     """Turn target weights into whole-share orders. Sells come first so buys have cash."""
     orders = []
     for sym, w in targets.items():
@@ -116,13 +123,22 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
         bars = live_signal_bars(s.signal_symbol, qqq_px, risk.volume_projection)
         sig = compute_signals(bars, s)
         last = sig.iloc[-1]
-        rec.update({
-            "bar_date": str(sig.index[-1].date()), "qqq": qqq_px,
-            "trend": last["trend"], "mr": last["mr"], "vibha": last["vibha"],
-            "vol_scale": last["vol_scale"], "net": last["net"],
-            "dist_days": int(last["dist_days"]), "sell_flags": int(last["sell_flags"]),
-            "vibha_event": last["vibha_event"], "w_long": last["w_long"], "w_short": last["w_short"],
-        })
+        rec.update(
+            {
+                "bar_date": str(sig.index[-1].date()),
+                "qqq": qqq_px,
+                "trend": last["trend"],
+                "mr": last["mr"],
+                "vibha": last["vibha"],
+                "vol_scale": last["vol_scale"],
+                "net": last["net"],
+                "dist_days": int(last["dist_days"]),
+                "sell_flags": int(last["sell_flags"]),
+                "vibha_event": last["vibha_event"],
+                "w_long": last["w_long"],
+                "w_short": last["w_short"],
+            }
+        )
 
         # ---- risk checks ----
         today = pd.Timestamp.now(tz="America/New_York").tz_localize(None).normalize()
@@ -156,16 +172,34 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
             if o.quantity * prices[o.symbol] > risk.max_order_value:
                 raise RuntimeError(f"Order {o} exceeds max_order_value {risk.max_order_value}")
 
-        rec.update({"capital": capital, "equity": strat_equity, "peak": peak, "positions": positions, "prices": prices,
-                    "orders": [vars(o) for o in orders]})
+        rec.update(
+            {
+                "capital": capital,
+                "equity": strat_equity,
+                "peak": peak,
+                "positions": positions,
+                "prices": prices,
+                "orders": [vars(o) for o in orders],
+            }
+        )
         armed = cfg.broker.name == "paper" or (live and cfg.broker.live_trading_enabled)
         for o in orders:
             result = broker.place(o) if armed else "DRY-RUN"
             if armed:  # ledger uses the reference price; MOC slippage makes it a close approximation
                 store.data["strategy_cash"] -= o.signed_qty * prices[o.symbol]
-            store.append_trade({"ts": rec["ts"], "broker": cfg.broker.name, "symbol": o.symbol, "side": o.side,
-                                "qty": o.quantity, "type": o.order_type, "ref_price": prices[o.symbol],
-                                "net_signal": round(float(last["net"]), 3), "result": result})
+            store.append_trade(
+                {
+                    "ts": rec["ts"],
+                    "broker": cfg.broker.name,
+                    "symbol": o.symbol,
+                    "side": o.side,
+                    "qty": o.quantity,
+                    "type": o.order_type,
+                    "ref_price": prices[o.symbol],
+                    "net_signal": round(float(last["net"]), 3),
+                    "result": result,
+                }
+            )
             log.info("%s %s %d %s -> %s", o.side, o.symbol, o.quantity, o.order_type, result)
         rec["status"] = ("executed" if armed else "dry-run") if orders else "no change"
         if armed:

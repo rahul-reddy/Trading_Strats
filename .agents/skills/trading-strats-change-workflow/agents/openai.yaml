@@ -1,0 +1,4 @@
+interface:
+  display_name: "Trading_Strats Change Workflow"
+  short_description: "Build, review and ship trading strategy changes"
+  default_prompt: "Use $trading-strats-change-workflow to implement and verify this Trading_Strats change."

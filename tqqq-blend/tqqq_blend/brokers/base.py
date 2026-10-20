@@ -7,7 +7,7 @@ from typing import Protocol
 @dataclass
 class Order:
     symbol: str
-    side: str        # "BUY" | "SELL"
+    side: str  # "BUY" | "SELL"
     quantity: int
     order_type: str  # "MOC" | "MKT"
 
@@ -27,15 +27,18 @@ class Broker(Protocol):
     def place(self, order: Order) -> str: ...
 
 
-def make_broker(cfg) -> "Broker":
+def make_broker(cfg) -> Broker:
     name = cfg.broker.name.lower()
     if name == "paper":
         from .paper import PaperBroker
+
         return PaperBroker(cfg)
     if name == "ibkr":
         from .ibkr import IBKRBroker
+
         return IBKRBroker(cfg)
     if name == "schwab":
         from .schwab import SchwabBroker
+
         return SchwabBroker(cfg)
     raise ValueError(f"Unknown broker '{cfg.broker.name}' (paper | ibkr | schwab)")
