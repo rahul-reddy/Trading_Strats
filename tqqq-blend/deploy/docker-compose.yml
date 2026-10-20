@@ -1,0 +1,74 @@
+# Runs on the AWS server from /opt/trading/app/deploy. Two IB Gateways (logged in and kept alive by IBC)
+# plus one-shot strategy containers started by the systemd timers in deploy/server/.
+#
+#   docker compose --profile paper up -d ibgw-paper    # gateway for the paper account
+#   docker compose --profile live up -d ibgw-live      # gateway for the live account
+# install.sh starts each gateway only when its login is in SSM.
+#   docker compose run --rm tqqq-paper run --live      # what the paper timer runs
+#   docker compose run --rm tqqq-paper ibkr-check      # read-only connection test
+#
+# Usernames come from deploy/.env, a link to /opt/trading/secrets/ibkr.env that install.sh writes
+# from SSM Parameter Store. Passwords are Compose secrets (files), never environment variables.
+#
+# No ports are published to the host network: only containers on this Compose network can reach
+# the gateways' API ports, and the security group has no inbound rules at all.
+
+x-gateway: &gateway
+  image: ghcr.io/gnzsnz/ib-gateway:10.50.1f
+  restart: always
+  environment: &gw-env
+    READ_ONLY_API: "no"
+    TWOFA_DEVICE: IB Key                       # with more than one 2FA method on the login, the gateway asks which to use
+    TWOFA_TIMEOUT_ACTION: restart
+    RELOGIN_AFTER_TWOFA_TIMEOUT: "yes"
+    AUTO_RESTART_TIME: "11:45 PM"              # IBC needs one; the server is stopped by then, so every start is a full login
+    EXISTING_SESSION_DETECTED_ACTION: primary
+    TIME_ZONE: America/New_York
+    TZ: America/New_York
+    JAVA_HEAP_SIZE: "768"
+    TWS_ACCEPT_INCOMING: accept
+    TWS_SETTINGS_PATH: /home/ibgateway/tws_settings
+
+x-job: &job
+  image: tqqq-blend:latest
+  profiles: [ jobs ]
+  volumes: [ "/opt/trading/state:/app/state" ]
+  command: [ "signal" ]
+
+services:
+  ibgw-paper:
+    <<: *gateway
+    container_name: ibgw-paper
+    profiles: [ paper ]
+    environment:
+      <<: *gw-env
+      TRADING_MODE: paper
+      TWS_USERID: ${IBKR_PAPER_USERNAME:-}
+      TWS_PASSWORD_FILE: /run/secrets/ibkr_paper_password
+    secrets: [ ibkr_paper_password ]
+    volumes: [ "/opt/trading/gateway/paper:/home/ibgateway/tws_settings" ]
+
+  ibgw-live:
+    <<: *gateway
+    container_name: ibgw-live
+    profiles: [ live ]
+    environment:
+      <<: *gw-env
+      TRADING_MODE: live
+      TWS_USERID: ${IBKR_LIVE_USERNAME:-}
+      TWS_PASSWORD_FILE: /run/secrets/ibkr_live_password
+    secrets: [ ibkr_live_password ]
+    volumes: [ "/opt/trading/gateway/live:/home/ibgateway/tws_settings" ]
+
+  tqqq-paper:
+    <<: *job
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    entrypoint: [ "python", "-m", "tqqq_blend", "--config", "config.aws-paper.toml" ]
+
+  tqqq-live:
+    <<: *job
+    entrypoint: [ "python", "-m", "tqqq_blend", "--config", "config.aws-live.toml" ]
+
+secrets:
+  ibkr_paper_password: { file: /opt/trading/secrets/ibkr_paper_password }
+  ibkr_live_password: { file: /opt/trading/secrets/ibkr_live_password }

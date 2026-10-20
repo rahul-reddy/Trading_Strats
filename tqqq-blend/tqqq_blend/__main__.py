@@ -3,7 +3,10 @@
   backtest      full-history backtest of the blend and each sleeve (synthetic TQQQ/SQQQ from 1999)
   signal        today's signal and sleeve diagnostics from end-of-day data (no broker needed)
   run           the near-close process: compute targets, plan orders, execute (dry-run by default)
+  ibkr-check    read-only IBKR connection test: account, balances, positions, quotes (never places orders)
   schwab-login  one-time (and weekly) Schwab OAuth login that writes the token file
+
+Broker profiles: python -m tqqq_blend --config config.ibkr-paper.toml <command>
 """
 from __future__ import annotations
 
@@ -31,12 +34,14 @@ def main():
     r.add_argument("--broker", choices=["paper", "ibkr", "schwab"])
     r.add_argument("--live", action="store_true", help="actually send orders (also needs live_trading_enabled)")
     r.add_argument("--force", action="store_true", help="ignore the near-close window and stale-data check")
+    sub.add_parser("ibkr-check")
     sub.add_parser("schwab-login")
     args = ap.parse_args()
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
-                        handlers=[logging.StreamHandler(), logging.FileHandler("tqqq_blend.log")])
     cfg = load_config(args.config)
+    Path(cfg.state_dir).mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
+                        handlers=[logging.StreamHandler(), logging.FileHandler(Path(cfg.state_dir) / "tqqq_blend.log")])
     pd.set_option("display.width", 200)
     pd.set_option("display.max_columns", 20)
     pd.set_option("display.float_format", "{:.3f}".format)
@@ -72,6 +77,20 @@ def main():
             cfg.broker.name = args.broker
         from .runner import run_once
         print(json.dumps(run_once(cfg, live=args.live, force=args.force), indent=2, default=str))
+
+    elif args.cmd == "ibkr-check":
+        from .brokers.ibkr import IBKRBroker
+        b = cfg.broker
+        print(f"Connecting read-only to {b.ibkr_host}:{b.ibkr_port}, expecting a {b.ibkr_account_type} account "
+              f"(config {args.config}, state_dir {cfg.state_dir})")
+        broker = IBKRBroker(cfg)
+        broker.connect(readonly=True, client_id=b.ibkr_client_id + 100)  # never collides with a scheduled run
+        try:
+            print(json.dumps(broker.describe(), indent=2, default=str))
+            print(f"\nConnected. Orders for this profile are {'ENABLED' if b.live_trading_enabled else 'disabled'} "
+                  f"(live_trading_enabled = {str(b.live_trading_enabled).lower()}).")
+        finally:
+            broker.disconnect()
 
     elif args.cmd == "schwab-login":
         from .brokers.schwab import SchwabBroker

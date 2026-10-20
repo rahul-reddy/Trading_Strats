@@ -1,0 +1,12 @@
+[Unit]
+Description=tqqq-blend near-close run, IBKR live account
+Requires=docker.service
+After=docker.service
+
+# Dry run: plans orders against the live account and logs them, sends nothing.
+# To trade: set live_trading_enabled = true in config.ibkr-live.toml, change `run` to `run --live`
+# below, and redeploy with deploy/push.sh.
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/trading/app/deploy
+ExecStart=/usr/bin/docker compose run --rm tqqq-live run

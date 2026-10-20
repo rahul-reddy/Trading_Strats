@@ -1,0 +1,9 @@
+[Unit]
+Description=tqqq-blend near-close run, IBKR paper account
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/trading/app/deploy
+ExecStart=/usr/bin/docker compose run --rm tqqq-paper run --live

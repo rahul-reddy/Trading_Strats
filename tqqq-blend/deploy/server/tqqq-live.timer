@@ -1,0 +1,9 @@
+[Unit]
+Description=tqqq-blend live runs every 5 minutes from 15:30 to 15:50 ET on weekdays
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 15:31,36,41,46,51:00 America/New_York
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

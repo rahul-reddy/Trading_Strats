@@ -1,0 +1,7 @@
+[Unit]
+Description=Copy /opt/trading/state (ledgers, trade logs, run logs) to S3
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/trading.env
+ExecStart=/usr/bin/aws s3 sync /opt/trading/state s3://${BUCKET}/state/ --exclude "cache/*" --exclude "*/cache/*" --exclude "backtest*"

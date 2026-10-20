@@ -1,0 +1,63 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Stack",
+      "Effect": "Allow",
+      "Action": "cloudformation:*",
+      "Resource": "arn:aws:cloudformation:us-east-1:*:stack/tqqq-trading/*"
+    },
+    {
+      "Sid": "StackRead",
+      "Effect": "Allow",
+      "Action": [ "cloudformation:ValidateTemplate", "cloudformation:GetTemplateSummary", "cloudformation:CreateChangeSet", "cloudformation:DescribeStacks" ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Ec2InRegion",
+      "Effect": "Allow",
+      "Action": "ec2:*",
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:RequestedRegion": "us-east-1" } }
+    },
+    {
+      "Sid": "StackRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:TagRole", "iam:PassRole",
+        "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
+        "iam:AttachRolePolicy", "iam:DetachRolePolicy",
+        "iam:CreateInstanceProfile", "iam:DeleteInstanceProfile", "iam:GetInstanceProfile",
+        "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile"
+      ],
+      "Resource": [ "arn:aws:iam::*:role/tqqq-trading-*", "arn:aws:iam::*:instance-profile/tqqq-trading-*" ]
+    },
+    {
+      "Sid": "Schedules",
+      "Effect": "Allow",
+      "Action": "scheduler:*",
+      "Resource": "arn:aws:scheduler:us-east-1:*:schedule/default/tqqq-trading-*"
+    },
+    {
+      "Sid": "Bucket",
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": [ "arn:aws:s3:::tqqq-trading-*", "arn:aws:s3:::tqqq-trading-*/*" ]
+    },
+    {
+      "Sid": "Secrets",
+      "Effect": "Allow",
+      "Action": [ "ssm:PutParameter", "ssm:GetParameter", "ssm:GetParameters", "ssm:DeleteParameter", "ssm:DescribeParameters" ],
+      "Resource": [ "arn:aws:ssm:us-east-1:*:parameter/trading/*", "arn:aws:ssm:us-east-1::parameter/aws/service/*" ]
+    },
+    {
+      "Sid": "Operate",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand", "ssm:GetCommandInvocation", "ssm:ListCommandInvocations", "ssm:ListCommands",
+        "ssm:StartSession", "ssm:TerminateSession", "ssm:ResumeSession", "ssm:DescribeInstanceInformation"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

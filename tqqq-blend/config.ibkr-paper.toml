@@ -1,0 +1,13 @@
+# IBKR paper account. Inherits the strategy and risk settings from config.toml.
+#   python -m tqqq_blend --config config.ibkr-paper.toml ibkr-check
+#   python -m tqqq_blend --config config.ibkr-paper.toml run --live --force    (manual test outside the window)
+extends = "config.toml"
+state_dir = "state/ibkr-paper"   # its own cash ledger, equity peak, and trade log
+
+[broker]
+name = "ibkr"
+ibkr_account_type = "paper"      # refuses to trade if the login turns out to be a live account
+ibkr_host = "127.0.0.1"
+ibkr_port = 7497                 # TWS paper; IB Gateway paper is 4002
+ibkr_account = ""                # blank = the first account on the login, or e.g. "DU1234567"
+live_trading_enabled = true      # paper money, so orders go to the IBKR paper account

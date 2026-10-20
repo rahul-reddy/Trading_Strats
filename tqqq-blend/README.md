@@ -16,7 +16,11 @@ tqqq_blend/
   runner.py       daily process: gate -> signal -> risk -> plan -> execute -> log
   brokers/        paper.py, ibkr.py (ib_async), schwab.py (schwab-py)
   config.py       all parameters with defaults; config.toml overrides them
+config.toml                 strategy and risk settings
+config.ibkr-{paper,live}.toml   IBKR profiles: extend config.toml, own state_dir, account-type check
+config.aws-{paper,live}.toml    the same profiles pointed at the gateways on the AWS server
 scripts/register_task.ps1   Windows Task Scheduler setup
+deploy/                     AWS server: Docker, IB Gateway, systemd timers (see deploy/README.md)
 tests/                      pytest
 state/                      runtime files: cache, state.json, trades.csv, runs.jsonl, STOP
 ```
@@ -55,8 +59,9 @@ Schwab has no paper trading API, so test against IBKR paper or the local paper b
    - add `127.0.0.1` to trusted IPs
    - **uncheck Read-Only API**
 3. Gateway logs out daily. Use its auto-restart setting, or [IBC](https://github.com/IbcAlpha/IBC) for unattended logins.
-4. Set `[broker] name = "ibkr"`, `ibkr_port`, and `ibkr_account` in `config.toml`.
-5. Orders go in as **MOC** (market-on-close) when submitted before 15:50 ET, otherwise as market orders.
+4. Use a profile instead of editing `config.toml`: `config.ibkr-paper.toml` (port 7497) and `config.ibkr-live.toml` (port 7496). Each one keeps its own ledger and logs in `state/ibkr-paper` or `state/ibkr-live`. Each sets `ibkr_account_type`, and a run refuses to start if the login's account is the other type (paper IDs start with `D`).
+5. Test the connection read-only: `python -m tqqq_blend --config config.ibkr-paper.toml ibkr-check`. It prints the account, balances, positions and quotes, and never places orders.
+6. Orders go in as **MOC** (market-on-close) when submitted before 15:50 ET, otherwise as market orders.
 
 ### Schwab
 1. Create an app at developer.schwab.com with the *Accounts and Trading Production* product. Callback URL: `https://127.0.0.1:8182`. Approval can take a few days.
@@ -94,7 +99,7 @@ Schwab has no paper trading API, so test against IBKR paper or the local paper b
 .\scripts\register_task.ps1 -Broker ibkr -Live   # real orders (also needs live_trading_enabled = true)
 ```
 
-The task fires every 5 minutes from 15:30 to 15:50 ET. The first successful run of the day acts, and later runs skip. The PC has to be on and awake: the task is set to wake it, but a laptop with its lid closed may not run. For unattended live trading, use a small always-on machine or a cloud VM. On half-days (13:00 close) the 15:30 window misses the close, so no trade happens; that's acceptable for this strategy.
+The task fires every 5 minutes from 15:30 to 15:50 ET. The first successful run of the day acts, and later runs skip. The PC has to be on and awake: the task is set to wake it, but a laptop with its lid closed may not run. For unattended live trading, use the AWS server in [deploy/](deploy/README.md). On half-days (13:00 close) the 15:30 window misses the close, so no trade happens; that's acceptable for this strategy.
 
 ## Accounts and tax
 

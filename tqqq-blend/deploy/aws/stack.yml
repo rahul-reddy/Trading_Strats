@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  tqqq-blend trading server. One EC2 instance in the default VPC running two IB Gateways and the
+  strategy in Docker. No inbound access: administration goes through SSM Session Manager / Run Command.
+  EventBridge Scheduler starts it before the close on weekdays and stops it afterwards; each start is
+  a fresh IBKR login, so the live account sends one 2FA push a day.
+  Deploy:  aws cloudformation deploy --stack-name tqqq-trading --template-file deploy/aws/stack.yml
+           --capabilities CAPABILITY_IAM --region us-east-1
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.medium            # 4 GB: two Java gateways at 768 MB heap each, plus the strategy runs
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+  SecretsPath:
+    Type: String
+    Default: /trading/ibkr         # SecureString parameters: paper/username, paper/password, live/...
+  StartCron:
+    Type: String
+    Default: cron(0 15 ? * MON-FRI *)    # 15:00 ET: ~25 minutes to log in and approve 2FA before the 15:30 run
+  StopCron:
+    Type: String
+    Default: cron(45 16 ? * MON-FRI *)   # 16:45 ET: after the MOC fills (16:00) and the state backup (16:30)
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain         # holds the state backups (trade logs, ledgers)
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      LifecycleConfiguration:
+        Rules:
+          - Id: old-releases
+            Status: Enabled
+            Prefix: releases/
+            ExpirationInDays: 90
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: trading
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ ssm:GetParameter, ssm:GetParameters, ssm:GetParametersByPath ]
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPath}*
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt Bucket.Arn
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub ${Bucket.Arn}/releases/*
+              - Effect: Allow
+                Action: [ s3:GetObject, s3:PutObject ]
+                Resource: !Sub ${Bucket.Arn}/state/*
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [ !Ref Role ]
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: tqqq-trading - no inbound; outbound for IBKR, market data, AWS APIs
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds: [ !GetAtt SecurityGroup.GroupId ]
+      MetadataOptions: { HttpTokens: required, HttpPutResponseHopLimit: 1 }
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: { VolumeSize: 30, VolumeType: gp3, Encrypted: true }
+      Tags:
+        - { Key: Name, Value: tqqq-trading }
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: scheduler.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition: { StringEquals: { aws:SourceAccount: !Ref AWS::AccountId } }
+      Policies:
+        - PolicyName: start-stop
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ ec2:StartInstances, ec2:StopInstances ]
+                Resource: !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Instance}
+              - Effect: Allow             # starting an instance with an encrypted volume
+                Action: kms:CreateGrant
+                Resource: "*"
+                Condition:
+                  StringEquals: { kms:ViaService: !Sub "ec2.${AWS::Region}.amazonaws.com" }
+                  Bool: { kms:GrantIsForAWSResource: true }
+
+  StartSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: tqqq-trading-start
+      Description: Start the trading server before the close
+      ScheduleExpression: !Ref StartCron
+      ScheduleExpressionTimezone: America/New_York
+      FlexibleTimeWindow: { Mode: "OFF" }
+      Target:
+        Arn: arn:aws:scheduler:::aws-sdk:ec2:startInstances
+        RoleArn: !GetAtt SchedulerRole.Arn
+        Input: !Sub '{"InstanceIds":["${Instance}"]}'
+
+  StopSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: tqqq-trading-stop
+      Description: Stop the trading server after the close
+      ScheduleExpression: !Ref StopCron
+      ScheduleExpressionTimezone: America/New_York
+      FlexibleTimeWindow: { Mode: "OFF" }
+      Target:
+        Arn: arn:aws:scheduler:::aws-sdk:ec2:stopInstances
+        RoleArn: !GetAtt SchedulerRole.Arn
+        Input: !Sub '{"InstanceIds":["${Instance}"]}'
+
+Outputs:
+  InstanceId:
+    Value: !Ref Instance
+  BucketName:
+    Value: !Ref Bucket

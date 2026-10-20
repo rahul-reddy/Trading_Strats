@@ -1,0 +1,11 @@
+[Unit]
+Description=tqqq-blend paper runs every 5 minutes from 15:30 to 15:50 ET on weekdays
+
+# The runner only acts 5-30 minutes before the close, skips holidays and early closes via the NYSE
+# calendar, and does nothing once today's run has completed, so the extra firings are no-ops.
+[Timer]
+OnCalendar=Mon..Fri *-*-* 15:30,35,40,45,50:00 America/New_York
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

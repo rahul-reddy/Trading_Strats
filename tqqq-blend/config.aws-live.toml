@@ -1,0 +1,9 @@
+# IBKR live account on the AWS server: the live profile, pointed at the ibgw-live container.
+#   docker compose run --rm tqqq-live ibkr-check      (from /opt/trading/app/deploy)
+# Orders stay disabled until live_trading_enabled = true in config.ibkr-live.toml AND the
+# tqqq-live service passes --live (deploy/server/tqqq-live.service).
+extends = "config.ibkr-live.toml"
+
+[broker]
+ibkr_host = "ibgw-live"
+ibkr_port = 4003                 # the image's relay to Gateway live (4001 inside the container)

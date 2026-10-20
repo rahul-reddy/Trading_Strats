@@ -100,6 +100,7 @@ class BrokerConfig:
     ibkr_port: int = 7497
     ibkr_client_id: int = 17
     ibkr_account: str = ""
+    ibkr_account_type: str = "paper"  # paper | live; checked against the account ID on connect (paper IDs start with D)
     ibkr_use_moc: bool = True
     # Schwab: secrets come from env vars SCHWAB_API_KEY / SCHWAB_APP_SECRET
     schwab_callback_url: str = "https://127.0.0.1:8182"
@@ -123,11 +124,24 @@ def _apply(obj, overrides: dict):
         setattr(obj, k, v)
 
 
+def _read(path: Path) -> dict:
+    """Read a TOML file. `extends = "other.toml"` (relative to this file) loads that file first, and this
+    file's values override it key by key. Broker profiles use it to share one strategy config."""
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    base = data.pop("extends", None)
+    if base is None:
+        return data
+    merged = _read(path.parent / base)
+    for k, v in data.items():
+        merged[k] = {**merged.get(k, {}), **v} if isinstance(v, dict) else v
+    return merged
+
+
 def load_config(path: str | Path | None = None) -> Config:
     cfg = Config()
     if path is None:
         return cfg
-    data = tomllib.loads(Path(path).read_text())
+    data = _read(Path(path))
     for section in ("strategy", "risk", "broker"):
         _apply(getattr(cfg, section), data.get(section, {}))
     if "state_dir" in data:

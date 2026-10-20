@@ -1,0 +1,7 @@
+# IBKR paper account on the AWS server: the paper profile, pointed at the ibgw-paper container.
+#   docker compose run --rm tqqq-paper ibkr-check     (from /opt/trading/app/deploy)
+extends = "config.ibkr-paper.toml"
+
+[broker]
+ibkr_host = "ibgw-paper"         # Compose service name; only reachable on the Compose network
+ibkr_port = 4004                 # the image's relay to Gateway paper (4002 inside the container)
