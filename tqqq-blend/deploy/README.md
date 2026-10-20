@@ -20,8 +20,10 @@ stopped too) and ~$0.20 for the public IP. Running it all the time would cost ab
 16:45  server stops
 ```
 
-- **Missed push:** if you miss it, the gateway restarts and sends another about every 3–4 minutes until the
-  first run at 15:30. If none is approved by 15:50, the live run fails and places nothing. Paper is unaffected.
+- **Missed push:** `TWOFA_TIMEOUT_ACTION: restart` is meant to restart the login and send a new push. In the
+  first test (2026-10-20), the gateway stayed on the 2FA dialog for 7+ minutes without resending. Until a resend
+  is confirmed, run `sudo docker restart ibgw-live` from a Session Manager shell to get a new push. If none is
+  approved by 15:50, the live run fails and places nothing. Paper is unaffected.
 - **Paper login:** paper logins normally don't need 2FA. If yours does, you get a second push.
 - **Paper username:** the paper account needs its own username, because IBKR allows one session per
   username and the live gateway uses yours. Client Portal shows the paper username, and lets you reset its
