@@ -396,17 +396,28 @@ function Assert-AgyHasNoExtensions {
         [ValidateRange(1, 86400)][int]$TimeoutSeconds = 60
     )
     $checks = @(
-        @{ Arguments = @('mcp', 'list'); Expected = 'No MCP servers configured' }
-        @{ Arguments = @('plugin', 'list'); Expected = 'No plugins installed' }
+        @{ Arguments = @('mcp', 'list'); Expected = 'No MCP servers configured.' }
+        @{ Arguments = @('plugin', 'list'); Expected = 'No plugins installed.' }
     )
     foreach ($check in $checks) {
         $listing = Invoke-BoundedProcess -FilePath $AgyCommand -ArgumentList $check.Arguments `
             -WorkingDirectory $WorkingDirectory -StandardInput '' -TimeoutSeconds $TimeoutSeconds
-        $text = ($listing.Stdout + "`n" + $listing.Stderr)
-        if ($listing.ExitCode -ne 0 -or $text -notmatch [regex]::Escape($check.Expected)) {
-            throw "agy $($check.Arguments -join ' ') reports extensions or failed; a review needs none. Output: $($text.Trim())"
+        if ($listing.ExitCode -ne 0 -or -not (Test-AgyListingEmpty -Stdout $listing.Stdout -Expected $check.Expected)) {
+            $text = ($listing.Stdout + ' ' + $listing.Stderr).Trim()
+            throw "agy $($check.Arguments -join ' ') reports extensions or failed; a review needs none. Output: $text"
         }
     }
+}
+
+# True only when the whole listing is the empty-state line (agy prints exactly
+# "No MCP servers configured." / "No plugins installed."). A substring match
+# would pass a listing that names servers AND contains that phrase.
+function Test-AgyListingEmpty {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Stdout,
+        [Parameter(Mandatory = $true)][string]$Expected
+    )
+    $Stdout.Trim() -ceq $Expected
 }
 
 # One stream-json input line carrying the whole prompt on stdin: `agy -p` takes

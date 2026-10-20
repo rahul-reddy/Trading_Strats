@@ -191,11 +191,24 @@ function Invoke-Reviewer {
                 $arguments = @('--model', $model, '--mode', 'plan', '--sandbox',
                     '--input-format', 'stream-json', '--output-format', 'stream-json')
                 if ($effort) { $arguments += @('--effort', $effort) }
-                $result = Invoke-BoundedProcess -FilePath $agy -ArgumentList $arguments `
-                    -WorkingDirectory $ReviewRoot -StandardInput (New-AgyStreamInput -Prompt $promptText) `
-                    -TimeoutSeconds $TimeoutSeconds
-                $exitCode = $result.ExitCode
-                $raw = if ($exitCode -eq 0) { Get-AgyStreamResult -Stdout $result.Stdout -ExpectedModel $model } else { $result.Stdout }
+                # One retry, only for agy's transient "stream was interrupted" error
+                # (seen on TenFold#141, 2026-10-20). Same reviewer, same head: it cannot
+                # turn into reviewer-shopping, and any other failure still falls through.
+                for ($attempt = 1; $attempt -le 2; $attempt++) {
+                    $result = Invoke-BoundedProcess -FilePath $agy -ArgumentList $arguments `
+                        -WorkingDirectory $ReviewRoot -StandardInput (New-AgyStreamInput -Prompt $promptText) `
+                        -TimeoutSeconds $TimeoutSeconds
+                    $exitCode = $result.ExitCode
+                    if ($exitCode -ne 0) { $raw = $result.Stdout; break }
+                    try {
+                        $raw = Get-AgyStreamResult -Stdout $result.Stdout -ExpectedModel $model
+                        break
+                    }
+                    catch {
+                        if ($attempt -eq 2 -or $_.Exception.Message -notmatch 'stream was interrupted') { throw }
+                        Write-Host '  gemini: stream interrupted; retrying once.'
+                    }
+                }
             }
             'grok' {
                 # No CLI: the xAI API answers from the prompt alone, so it has no
