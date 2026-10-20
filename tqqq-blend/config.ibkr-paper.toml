@@ -4,6 +4,10 @@
 extends = "config.toml"
 state_dir = "state/ibkr-paper"   # its own cash ledger, equity peak, and trade log
 
+[risk]
+capital = 100000                 # paper money; the ledger is seeded from this on the first run only
+max_order_value = 150000         # a full move into TQQQ is ~capital, so the default 25k cap would block it
+
 [broker]
 name = "ibkr"
 ibkr_account_type = "paper"      # refuses to trade if the login turns out to be a live account

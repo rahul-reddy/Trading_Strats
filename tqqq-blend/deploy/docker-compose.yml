@@ -33,6 +33,8 @@ x-job: &job
   image: tqqq-blend:latest
   profiles: [ jobs ]
   volumes: [ "/opt/trading/state:/app/state" ]
+  environment:
+    FINVIZ_TOKEN: ${FINVIZ_TOKEN:-}              # real-time quotes (quotes.py); from SSM via install.sh
   command: [ "signal" ]
 
 services:

@@ -86,7 +86,11 @@ def main():
         broker = IBKRBroker(cfg)
         broker.connect(readonly=True, client_id=b.ibkr_client_id + 100)  # never collides with a scheduled run
         try:
-            print(json.dumps(broker.describe(), indent=2, default=str))
+            info = broker.describe()
+            if b.quote_source == "finviz":
+                from .quotes import get_prices
+                info["quotes_used_by_run"] = dict(zip(("prices", "source"), get_prices(cfg, broker, list(info["quotes"]))))
+            print(json.dumps(info, indent=2, default=str))
             print(f"\nConnected. Orders for this profile are {'ENABLED' if b.live_trading_enabled else 'disabled'} "
                   f"(live_trading_enabled = {str(b.live_trading_enabled).lower()}).")
         finally:

@@ -16,7 +16,7 @@ Parameters:
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
   SecretsPath:
     Type: String
-    Default: /trading/ibkr         # SecureString parameters: paper/username, paper/password, live/...
+    Default: /trading              # SecureString parameters: ibkr/{paper,live}/{username,password}, finviz/token
   StartCron:
     Type: String
     Default: cron(0 15 ? * MON-FRI *)    # 15:00 ET: ~25 minutes to log in and approve 2FA before the 15:30 run
@@ -62,7 +62,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: [ ssm:GetParameter, ssm:GetParameters, ssm:GetParametersByPath ]
-                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPath}*
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPath}/*
               - Effect: Allow
                 Action: s3:ListBucket
                 Resource: !GetAtt Bucket.Arn

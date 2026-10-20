@@ -21,6 +21,7 @@ max_signal_move = 0.08
 [broker]
 name = "paper"                 # paper -> ibkr (paper port) -> live
 live_trading_enabled = false   # second safety: --live does nothing unless this is true
+quote_source = "finviz"        # real-time Finviz Elite quotes (env FINVIZ_TOKEN); falls back to the broker
 ibkr_port = 7497               # TWS paper. 7496 = TWS live, 4002/4001 = Gateway paper/live
 ibkr_account = ""              # e.g. "DU1234567" for paper; blank = first managed account
 ibkr_use_moc = true

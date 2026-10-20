@@ -81,6 +81,13 @@ done
 unset u p
 ```
 
+Finviz Elite token, for real-time quotes (`quote_source = "finviz"` in `config.toml`). Without the token,
+runs fall back to IBKR quotes, which are 15 minutes delayed on a paper account.
+
+```bash
+read -s -p "finviz token: " t; echo; aws ssm put-parameter --type SecureString --overwrite --name /trading/finviz/token --value "$t"; unset t
+```
+
 Skip `live` to run paper only. The live gateway and timer stay off until those parameters exist.
 
 **3. Stack, then code:**

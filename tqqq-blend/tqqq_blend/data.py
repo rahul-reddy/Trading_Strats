@@ -36,7 +36,8 @@ def live_signal_bars(symbol: str, live_price: float | None, volume_projection: f
     """Recent history with today's in-progress bar, its close replaced by the live price and its
     volume projected to a full day. Used by the near-close runner."""
     raw = yf.Ticker(symbol).history(period="2y", auto_adjust=True)
-    df = raw.rename(columns=str.lower)[["open", "high", "low", "close", "volume"]].copy()
+    # float: volume arrives as int64, and pandas 3 refuses to store the projected (fractional) volume in it
+    df = raw.rename(columns=str.lower)[["open", "high", "low", "close", "volume"]].astype(float)
     df.index = pd.DatetimeIndex(df.index.tz_localize(None).normalize(), name="date")
     today = pd.Timestamp.now(tz="America/New_York").tz_localize(None).normalize()
     if df.index[-1] == today:

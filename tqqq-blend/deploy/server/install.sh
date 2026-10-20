@@ -50,8 +50,10 @@ if [ -n "$PAPER_USER" ] && [ "$PAPER_USER" = "$LIVE_USER" ]; then
 fi
 write_secret "$ROOT/secrets/ibkr_paper_password" "$([ -z "$PAPER_USER" ] || param paper/password)"
 write_secret "$ROOT/secrets/ibkr_live_password" "$([ -z "$LIVE_USER" ] || param live/password)"
+FINVIZ_TOKEN=$(aws ssm get-parameter --with-decryption --name /trading/finviz/token --query Parameter.Value --output text 2>/dev/null || true)
+[ -n "$FINVIZ_TOKEN" ] || echo "No /trading/finviz/token in SSM: runs will use broker quotes."
 install -m 600 /dev/null "$ROOT/secrets/ibkr.env"
-printf 'IBKR_PAPER_USERNAME=%s\nIBKR_LIVE_USERNAME=%s\n' "$PAPER_USER" "$LIVE_USER" > "$ROOT/secrets/ibkr.env"
+printf 'IBKR_PAPER_USERNAME=%s\nIBKR_LIVE_USERNAME=%s\nFINVIZ_TOKEN=%s\n' "$PAPER_USER" "$LIVE_USER" "$FINVIZ_TOKEN" > "$ROOT/secrets/ibkr.env"
 ln -sfn "$ROOT/secrets/ibkr.env" "$APP/deploy/.env"
 echo "BUCKET=$BUCKET" > /etc/trading.env
 

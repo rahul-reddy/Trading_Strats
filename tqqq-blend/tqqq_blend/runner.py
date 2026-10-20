@@ -21,6 +21,7 @@ import pandas_market_calendars as mcal
 from .brokers import Order, make_broker
 from .config import Config
 from .data import live_signal_bars
+from .quotes import get_prices
 from .strategy import compute_signals
 
 log = logging.getLogger("tqqq_blend")
@@ -110,7 +111,8 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
     broker = make_broker(cfg)
     broker.connect()
     try:
-        qqq_px = broker.last_price(s.signal_symbol)
+        quotes, rec["quote_source"] = get_prices(cfg, broker, (s.signal_symbol, s.long_symbol, s.short_symbol))
+        qqq_px = quotes[s.signal_symbol]
         bars = live_signal_bars(s.signal_symbol, qqq_px, risk.volume_projection)
         sig = compute_signals(bars, s)
         last = sig.iloc[-1]
@@ -130,7 +132,7 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
         if day_move > risk.max_signal_move:
             raise RuntimeError(f"QQQ moved {day_move:.1%} today (> {risk.max_signal_move:.0%}); review manually")
 
-        prices = {sym: broker.last_price(sym) for sym in (s.long_symbol, s.short_symbol)}
+        prices = {sym: quotes[sym] for sym in (s.long_symbol, s.short_symbol)}
         positions = broker.positions()
         held_value = sum(positions.get(k, 0) * prices[k] for k in prices)
         netliq = broker.net_liquidation()

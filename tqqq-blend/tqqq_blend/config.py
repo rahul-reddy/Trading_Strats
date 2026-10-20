@@ -94,6 +94,8 @@ class RiskConfig:
 class BrokerConfig:
     name: str = "paper"              # paper | ibkr | schwab
     live_trading_enabled: bool = False
+    quote_source: str = "broker"     # broker | finviz (Elite export API, real time); see quotes.py
+    finviz_token_env: str = "FINVIZ_TOKEN"  # environment variable holding the Finviz Elite token
     # IBKR (TWS or IB Gateway must be running). 7497 = TWS paper, 7496 = TWS live,
     # 4002 = Gateway paper, 4001 = Gateway live.
     ibkr_host: str = "127.0.0.1"
