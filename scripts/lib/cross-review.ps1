@@ -18,7 +18,8 @@
 # (owner decision, 2026-10-20). The Gemini CLI's API-key path had been
 # unavailable for every review (429: no quota for the pinned Pro model), and
 # Google login no longer works in that CLI. Antigravity offers Gemini 3.8 Flash
-# only, so Gemini is NOT eligible on critical-tier diffs ($CriticalTierExcluded).
+# only; the owner accepted it at high effort for every tier, critical included
+# (2026-10-20), so Gemini normally decides critical diffs too.
 #
 # Grok is last on purpose (owner decision, 2026-09-30): a backup reached only
 # when every other eligible reviewer is unavailable, so one provider's outage or
@@ -125,9 +126,7 @@ function Invoke-BoundedProcess {
 # tier for Codex, same as Claude (see Get-ReviewerEffort).
 #
 # Gemini's agy model names carry the thinking level (gemini-3.8-flash-high /
-# -medium / -low; `agy models` lists them). Its critical entry keeps the table
-# complete; Gemini never reviews a critical diff ($CriticalTierExcluded), and a
-# forced `-Reviewer gemini` there is refused as not eligible.
+# -medium / -low; `agy models` lists them).
 # agy reports the model it actually loaded in its init event, and the review
 # fails closed if that differs from the pin (Get-AgyStreamResult).
 # Update these when the providers rename their models.
@@ -138,9 +137,9 @@ $script:ReviewerModels = @{
 }
 
 # Reviewers that may not decide a critical-tier diff, whatever their effort.
-# Gemini is limited to Flash through Antigravity; AGENTS.md says a lighter model
-# must never be the sole reviewer of a critical path (owner decision, 2026-10-20).
-$script:CriticalTierExcluded = @('gemini')
+# Empty: the owner allowed Gemini 3.8 Flash at high effort on critical diffs
+# (2026-10-20). Add a reviewer here if a model is ever judged too light for them.
+$script:CriticalTierExcluded = @()
 
 function Get-ReviewerModel {
     param(
@@ -278,8 +277,8 @@ function Get-BlastRadiusTier {
 #
 # Gemini via agy takes --effort (low|medium|high|xhigh|max), confirmed live
 # 2026-10-20 with gemini-3.8-flash-high. It matches the thinking level already in
-# the pinned model name. Being in this table no longer makes a reviewer
-# critical-eligible; $CriticalTierExcluded decides that.
+# the pinned model name. Critical eligibility is decided by $CriticalTierExcluded,
+# not by whether a reviewer appears in this table.
 #
 # Owner-chosen cost/quality trade-off (2026-09-14, revised same day): Codex
 # runs gpt-6-astra at 'low' ("light") effort across every tier -- the
@@ -523,13 +522,11 @@ function Get-EligibleReviewers {
     $Authors = @($Authors | ForEach-Object { $_ } | Where-Object { $null -ne $_ })
     $pool = $script:ReviewerPool
     if ($Tier -eq 'critical') {
-        # With the pool in Gemini-first order, Gemini would otherwise complete the
-        # review alone on every PR -- including one touching a broker adapter --
-        # since a completed review stops the search. Through Antigravity it is
-        # limited to a Flash model, which AGENTS.md does not allow as the sole
-        # reviewer of a critical path. This list is explicit on purpose: the
-        # earlier rule ("no effort setting") would have made Gemini eligible the
-        # moment agy gained --effort.
+        # A completed review stops the search, so whoever is first in the pool
+        # normally decides critical diffs alone. $CriticalTierExcluded names any
+        # reviewer judged too light for that; it is an explicit list on purpose,
+        # because the earlier rule ("no effort setting") changed meaning silently
+        # when a CLI gained an effort flag.
         $pool = $pool | Where-Object { $_ -notin $script:CriticalTierExcluded }
     }
     $pool | Where-Object { $_ -notin $Authors }

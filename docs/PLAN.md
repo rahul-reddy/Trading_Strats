@@ -36,4 +36,4 @@ paper (4+ weeks), live small (3+ months), scale.
   uv.lock, so there is nothing to publish on merge.
 - 2026-10-20: The Gemini reviewer runs through the Antigravity CLI on the owner's Google (Pro)
   login, replacing the Gemini CLI (API key: 429 on every review). Antigravity offers Gemini 3.8
-  Flash only, so Gemini reviews standard and low-tier diffs, never critical ones.
+  Flash only. Gemini reviews every tier at high effort, critical included (owner, same day).

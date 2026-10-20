@@ -66,7 +66,10 @@ merges on its own model's approval alone.
   than a blocked PR: it launders false confidence into the audit trail while catching
   nothing. Waiting for a usage limit to reset is an acceptable outcome; lowering the bar
   to avoid waiting is not. If a weaker model is ever added, gate it so it cannot be the
-  sole reviewer for changes touching a critical path (listed below).
+  sole reviewer for changes touching a critical path (listed below), by adding it to
+  `$script:CriticalTierExcluded`. Gemini 3.8 Flash at high effort is NOT gated: the owner
+  accepted it as a sole reviewer for every tier, critical included (2026-10-20), after it
+  blocked a planted bug in a live test.
 - **Blast-radius tiering** (`Get-BlastRadiusTier` in `scripts/lib/cross-review.ps1`)
   classifies the changed files into `critical` / `standard` / `low`, which
   `Get-ReviewerEffort` and `Get-ReviewerModel` both key off (below). `critical` (any path matching `$script:CriticalPathPatterns`: a strategy's
@@ -75,11 +78,9 @@ merges on its own model's approval alone.
   get each CLI's highest effort, though the owner-chosen per-tier settings below (see
   `Get-ReviewerEffort`) may deliberately fall short of that ceiling for cost reasons —
   `Get-BlastRadiusTier` only computes the tier, it does not guarantee an effort level.
-  Critical additionally **excludes Gemini from eligibility** (`$script:CriticalTierExcluded`;
-  owner decision, 2026-10-20): through Antigravity only Gemini 3.8 Flash is available, a
-  lighter model that must not be the sole reviewer of a critical path, and with Gemini tried
-  first a completed review stops the search. Critical diffs therefore go to Codex, then
-  Claude when Codex wrote them, then Grok. `low` (prose-only: `*.md`,
+  Reviewers listed in `$script:CriticalTierExcluded` may not decide a critical diff; the
+  list is currently empty, so critical diffs go to Gemini first like every other tier
+  (owner decision, 2026-10-20). `low` (prose-only: `*.md`,
   `docs/`, `*.css`, non-workflow `.github/`, or an ADDITIVE-only diff to a
   `<strategy>/tests/` folder) gets reduced effort. A test-path file with ANY deleted line — a
   removed or weakened test — is never `low`: that is exactly the "missing test for
@@ -112,9 +113,10 @@ merges on its own model's approval alone.
     confirmed live for every level used, including that `gpt-6-astra` accepts up to
     `ultra` and Claude's `opus` accepts up to `max` — those ceilings are documented, not
     currently used.
-  - **Gemini** runs `gemini-3.8-flash-high` with `--effort high` on standard diffs and
-    `gemini-3.8-flash-medium` with `--effort medium` on low ones (confirmed live
-    2026-10-20). It never reviews critical diffs (above).
+  - **Gemini** runs `gemini-3.8-flash-high` with `--effort high` on critical and standard
+    diffs and `gemini-3.8-flash-medium` with `--effort medium` on low ones (confirmed live
+    2026-10-20). Flash is the only Gemini model Antigravity offers on the owner's account;
+    move critical to a Pro model here if one appears in `agy models`.
 - Reviewer setup: `codex` and `claude` authenticate through their own CLIs; `grok` needs
   only `XAI_API_KEY` (environment or `.env`). **`gemini` runs through the Antigravity CLI
   (`agy`)** on the owner's Google login (owner decision, 2026-10-20): install Google
