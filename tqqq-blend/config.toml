@@ -1,0 +1,27 @@
+# Overrides for tqqq_blend/config.py defaults. Only list what you change.
+state_dir = "state"
+
+[strategy]
+# Sleeve weights: Mallik trend / Mallik mean reversion / Vibha Jha market timing
+weight_trend = 0.3333
+weight_mr = 0.3333
+weight_vibha = 0.3334
+max_long_alloc = 1.00     # 100% of strategy capital in TQQQ at full signal
+max_short_alloc = 0.50
+short_enabled = false     # SQQQ momentum shorts (lost money in backtests)
+mr_short_enabled = true   # SQQQ rally-fade, small and short-lived
+vol_target = 0.20         # scale the net long by min(1, 0.20 / QQQ 20d realized vol); 0 = off
+
+[risk]
+capital = 10000           # dollars this strategy may use - start small
+max_order_value = 25000
+max_drawdown_halt = 0.45  # backtest max DD is ~35% since 2000 (v2); a 45% fall means something is broken
+max_signal_move = 0.08
+
+[broker]
+name = "paper"                 # paper -> ibkr (paper port) -> live
+live_trading_enabled = false   # second safety: --live does nothing unless this is true
+ibkr_port = 7497               # TWS paper. 7496 = TWS live, 4002/4001 = Gateway paper/live
+ibkr_account = ""              # e.g. "DU1234567" for paper; blank = first managed account
+ibkr_use_moc = true
+schwab_account_hash = ""

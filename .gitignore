@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Runtime state for every strategy: market-data cache, backtest output, broker
+# tokens, paper account, trade logs. All of it is regenerated or private.
+*/state/
+*.log
+
+# Secrets
+.env
+*token*.json
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
