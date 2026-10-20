@@ -30,7 +30,7 @@ quotes. First paper run is 2026-10-20 15:30 ET.
 
 - 2026-10-20: Gemini reviewer moved to the Antigravity CLI (agy, Google login): pinned
   gemini-3.8-flash-high, plan mode + sandbox, prompt on stdin. Verified end to end: approves a
-  clean change, blocks a planted CAGR sign bug. Still excluded from critical-tier diffs (Flash only).
+  clean change, blocks a planted CAGR sign bug. Owner then allowed it on critical diffs at high effort, in all three repos.
 
 - 2026-10-20: Found the gitleaks secret scan had never run on a PR (missing pull-requests: read and
   a shallow checkout; hidden by continue-on-error). Fixed with the Dependabot action bumps (checkout, setup-uv,

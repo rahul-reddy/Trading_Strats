@@ -57,14 +57,26 @@ Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') -Comments @(
         Review-Comment -Reviewer claude -Head $head -Verdict REQUEST_CHANGES -Blocking 1
     ) -HeadSha $head) $false 'one rejection blocks another approval'
 Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') `
+    -Comments @(Review-Comment -Reviewer gemini -Head $head) -HeadSha $head -Tier critical) $true `
+    'gemini may approve a critical change (owner decision, 2026-10-20)'
+# The exclusion list still works if a reviewer is ever put back on it.
+$savedExcluded = $script:CriticalTierExcluded
+$script:CriticalTierExcluded = @('gemini')
+Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') `
     -Comments @(Review-Comment -Reviewer gemini -Head $head) -HeadSha $head -Tier critical) $false `
-    'gemini cannot approve critical change'
+    'an excluded reviewer cannot approve a critical change'
+Assert-Equal ((Get-EligibleReviewers -Authors @('claude') -Tier critical) -join ',') 'codex,grok' `
+    'exclusion removes the reviewer from critical eligibility only'
+Assert-Equal ((Get-EligibleReviewers -Authors @('claude') -Tier standard) -join ',') 'gemini,codex,grok' `
+    'exclusion leaves standard eligibility alone'
+$script:CriticalTierExcluded = $savedExcluded
+Assert-Equal (Get-ReviewerEffort -Reviewer gemini -Tier critical) 'high' 'gemini runs high effort on critical'
 
 # Grok is the last-resort backup: after every other reviewer, still excluded
 # from reviewing its own work, and escalatable, so eligible on critical diffs.
 Assert-Equal ((Get-EligibleReviewers -Authors @('claude')) -join ',') 'gemini,codex,grok' `
     'grok is the last fallback'
-Assert-Equal ((Get-EligibleReviewers -Authors @('claude') -Tier critical) -join ',') 'codex,grok' `
+Assert-Equal ((Get-EligibleReviewers -Authors @('claude') -Tier critical) -join ',') 'gemini,codex,grok' `
     'grok may decide critical diffs'
 Assert-Equal ((Get-EligibleReviewers -Authors @('grok')) -join ',') 'gemini,codex,claude' `
     'grok never reviews its own commits'
