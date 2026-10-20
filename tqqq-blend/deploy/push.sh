@@ -19,10 +19,28 @@ export AWS_PROFILE=${AWS_PROFILE:-trading-deploy} AWS_REGION=${AWS_REGION:-us-ea
 STACK=${STACK:-tqqq-trading}
 cd "$(dirname "$0")/.."
 
+# --bundle-only <commit> <file>: write the bundle for <commit> and stop (no AWS calls, no prompt).
+# tests/test_push_bundle.py uses it to check that the bundle is that commit and nothing else.
+BUNDLE_ONLY=
+if [ "${1:-}" = --bundle-only ]; then BUNDLE_ONLY=${3:?usage: push.sh --bundle-only <commit> <file>}; set -- "$2"; fi
+
 git fetch --quiet origin main
 SHA=$(git rev-parse --verify "${1:-origin/main}^{commit}")
 git merge-base --is-ancestor "$SHA" origin/main || { echo "$SHA is not on origin/main; merge it first."; exit 1; }
 SHORT=${SHA:0:7}
+
+# The bundle is the committed tqqq-blend tree at $SHA: local edits, untracked files and the
+# checked-out branch cannot change it. git archive runs from the repository root: from this
+# subfolder it would silently filter the tree down to an empty archive.
+archive() { (cd "$(git rev-parse --show-toplevel)" && git archive --format=tar.gz "$SHA:tqqq-blend"); }
+if [ -n "$BUNDLE_ONLY" ]; then
+  archive > "$BUNDLE_ONLY"
+  exit 0
+fi
+BUNDLE=.push-bundle.tgz            # relative: Git Bash /tmp paths mean nothing to the Windows AWS CLI
+trap 'rm -f "$BUNDLE"' EXIT
+archive > "$BUNDLE"
+
 echo "Deploying tqqq-blend at $SHORT: $(git log -1 --format=%s "$SHA")"
 read -r -p "Type 'deploy $SHORT' to continue: " answer
 [ "$answer" = "deploy $SHORT" ] || { echo "Not confirmed; nothing deployed."; exit 1; }
@@ -43,10 +61,6 @@ fi
 until [ "$(aws ssm describe-instance-information --filters Key=InstanceIds,Values="$INSTANCE" \
           --query "InstanceInformationList[0].PingStatus" --output text)" = Online ]; do sleep 5; done
 
-BUNDLE=.push-bundle.tgz            # relative: Git Bash /tmp paths mean nothing to the Windows AWS CLI
-trap 'rm -f "$BUNDLE"' EXIT
-tar czf "$BUNDLE" --exclude=state --exclude='*.log' --exclude=__pycache__ --exclude=.pytest_cache \
-  --exclude=deploy/.env pyproject.toml uv.lock config*.toml tqqq_blend tests deploy
 aws s3 cp --only-show-errors "$BUNDLE" "s3://$BUCKET/$KEY"
 echo "Uploaded s3://$BUCKET/$KEY; installing on $INSTANCE ..."
 

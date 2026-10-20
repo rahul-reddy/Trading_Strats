@@ -9,12 +9,12 @@ runs the code of `f2da519` (deployed from the working tree, before push.sh requi
 - `pwsh -NoProfile -File scripts/cross-review-selftest.ps1`: passed
 - `uv run --no-project --with pyyaml python scripts/validate_skills.py`: passed
 - tqqq-blend: `uv sync --locked`, `ruff check`, `ruff format --check`, `mypy`: clean;
-  `pytest --cov`: 12 passed, 49% line coverage
+  `pytest --cov`: 14 passed, 49% line coverage (incl. deploy bundle tests: push.sh ships the commit, never the working tree)
 - Strategy output unchanged by the lint/format pass: compute_signals on QQQ since 1999 hashes the
   same before and after (6,945 rows)
 - `docker build -f deploy/Dockerfile .` from uv.lock: builds, `signal` runs
 
-**Running:** tqqq-blend on AWS, IBKR paper account DUT135096, $100k strategy capital, Finviz
+**Running:** tqqq-blend on AWS, the IBKR paper profile (config.aws-paper.toml), $100k strategy capital, Finviz
 quotes. First paper run is 2026-10-20 15:30 ET.
 
 **Remaining:**
