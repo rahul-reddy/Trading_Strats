@@ -75,10 +75,11 @@ merges on its own model's approval alone.
   get each CLI's highest effort, though the owner-chosen per-tier settings below (see
   `Get-ReviewerEffort`) may deliberately fall short of that ceiling for cost reasons —
   `Get-BlastRadiusTier` only computes the tier, it does not guarantee an effort level.
-  Critical additionally **excludes Gemini from eligibility**: its CLI has no
-  reasoning-effort control (see below), and with Gemini tried first a completed review
-  stops the search, so critical diffs would otherwise be normally decided by the one
-  reviewer that never gets escalated. `low` (prose-only: `*.md`,
+  Critical additionally **excludes Gemini from eligibility** (`$script:CriticalTierExcluded`;
+  owner decision, 2026-10-20): through Antigravity only Gemini 3.8 Flash is available, a
+  lighter model that must not be the sole reviewer of a critical path, and with Gemini tried
+  first a completed review stops the search. Critical diffs therefore go to Codex, then
+  Claude when Codex wrote them, then Grok. `low` (prose-only: `*.md`,
   `docs/`, `*.css`, non-workflow `.github/`, or an ADDITIVE-only diff to a
   `<strategy>/tests/` folder) gets reduced effort. A test-path file with ANY deleted line — a
   removed or weakened test — is never `low`: that is exactly the "missing test for
@@ -88,13 +89,14 @@ merges on its own model's approval alone.
   Everything else is `standard`. The computed tier and per-reviewer effort are printed
   and recorded in the posted PR comment.
 - **The model is pinned per reviewer per tier** in `$script:ReviewerModels`, because none
-  of these CLIs guarantee a specific model on their own: Gemini reads `GEMINI_MODEL` and
-  auto-routes simple prompts to Flash, and Codex takes its default from a mutable
+  of these CLIs guarantee a specific model on their own: Antigravity's `agy` uses whatever
+  model its IDE last selected, and Codex takes its default from a mutable
   `~/.codex/config.toml`. Either could silently answer with a different model than
   intended, whose APPROVE would still satisfy the gate. Command-line arguments outrank
   both. A pinned model the account cannot use makes the CLI fail, so the reviewer reports
-  unavailable and the pool falls past it — fail-closed. Update the pins when a provider
-  renames a model.
+  unavailable and the pool falls past it — fail-closed. `agy` also reports the model it
+  loaded, and the review fails closed if that is not the pin. Update the pins when a
+  provider renames a model (`agy models` lists Antigravity's).
 - **Reasoning effort is tuned by tier** (owner decision, 2026-09-14; a same-day
   critical-tier `gpt-5.6-sol`/`high` experiment for Codex was reverted the same day as
   overkill in the other direction):
@@ -110,35 +112,31 @@ merges on its own model's approval alone.
     confirmed live for every level used, including that `gpt-6-astra` accepts up to
     `ultra` and Claude's `opus` accepts up to `max` — those ceilings are documented, not
     currently used.
-  - **Gemini's CLI exposes no reasoning-effort flag in this version**, so it always runs
-    at its own default regardless of tier; `Get-ReviewerEffort` returns `$null` for it
-    and the invocation omits the flag rather than guess at one. This is one reason
-    critical-tier diffs exclude Gemini from eligibility (above) instead of trusting it
-    to escalate on its own.
+  - **Gemini** runs `gemini-3.8-flash-high` with `--effort high` on standard diffs and
+    `gemini-3.8-flash-medium` with `--effort medium` on low ones (confirmed live
+    2026-10-20). It never reviews critical diffs (above).
 - Reviewer setup: `codex` and `claude` authenticate through their own CLIs; `grok` needs
-  only `XAI_API_KEY` (environment or `.env`). `gemini`
-  needs `npm i -g @google/gemini-cli` and `GEMINI_API_KEY` (generate at
-  aistudio.google.com) plus `"security":{"auth":{"selectedType":"gemini-api-key"}}` in
-  `~/.gemini/settings.json`. **"Login with Google" (`oauth-personal`) no longer works**:
-  Google discontinued that path for individual/Pro accounts on 2026-06-18
-  (`IneligibleTierError`, pointing at Antigravity CLI instead); do not re-attempt it.
-  A fresh API key may also report a 429 with zero free-tier quota specifically for the
-  pinned frontier model even once auth succeeds — that needs Cloud Billing enabled on
-  the key's Google Cloud project, confirmed separately from getting the key itself
-  (a cheaper model like `gemini-2.5-flash` succeeding while the pinned model 429s is the
-  signature of this, not a config problem). Until both auth and quota are resolved,
-  `gemini` reports unavailable and the pool falls past it, same as any other outage.
+  only `XAI_API_KEY` (environment or `.env`). **`gemini` runs through the Antigravity CLI
+  (`agy`)** on the owner's Google login (owner decision, 2026-10-20): install Google
+  Antigravity and sign in once; `agy` lives in `~/.gemini/bin` and need not be on PATH.
+  The Gemini CLI is no longer used: its Google login stopped working for individual/Pro
+  accounts on 2026-06-18, and its API-key path returned 429 (no quota for the pinned Pro
+  model) on every review. `agy` takes the prompt on stdin as one stream-json message,
+  runs in `--mode plan --sandbox` (confirmed read-only: a run told to write, delete and
+  run a command did none of them), and is told commands are disabled, because a denied
+  command otherwise ends its turn with an empty answer.
 - Known limitation: Codex CLI's sandbox backend is currently disabled on Windows, so
   reviewing as Codex requires `--dangerously-bypass-approvals-and-sandbox` to read the
   repository at all. It is scoped by instructing the reviewer that it is read-only and
   must not modify, stage, commit or push anything; that instruction is not sandbox-enforced
-  the way Claude's `--restricted` and Gemini's `--approval-mode plan` are. Revisit once
+  the way Claude's `--restricted` and Gemini's `agy --mode plan` are. Revisit once
   Codex ships Windows sandboxing.
 - **Reviewers run with no MCP servers** (`Get-ReviewerNoMcpArguments`). The owner's
   everyday MCP registrations (REA, claude.ai connectors such as Gmail) would otherwise
   load into every review: extra startup time, an extra way for a reviewer to report
   unavailable, and tools that reach outside the repository. Claude gets
-  `--strict-mcp-config`, Gemini an allow-list naming no real server, and Codex
+  `--strict-mcp-config`; `agy` has no per-run switch, so Gemini reports unavailable unless
+  `agy mcp list` and `agy plugin list` show none configured; and Codex
   `-c mcp_servers.<name>.enabled=false` for each server `codex mcp list --json` reports
   (`-c mcp_servers={}` merges and disables nothing). If that listing cannot be read,
   Codex reports unavailable rather than review with servers that may still load.

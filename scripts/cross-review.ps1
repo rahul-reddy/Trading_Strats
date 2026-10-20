@@ -11,24 +11,6 @@ param(
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/lib/cross-review.ps1"
 
-# `setx`/System Properties only affects processes started AFTER the change; a
-# terminal or IDE session opened earlier keeps running without it until
-# restarted, which for a long-lived agent session can be indefinitely. Rather
-# than fail every run until someone remembers to restart, read the persisted
-# User value directly when the in-process one is unset. This is Windows-only
-# and reads back only what the operator already explicitly set for exactly
-# this purpose; it is never logged or written anywhere.
-if (-not $env:GEMINI_API_KEY -and $IsWindows -ne $false) {
-    try {
-        $persisted = [Environment]::GetEnvironmentVariable('GEMINI_API_KEY', 'User')
-        if ($persisted) { $env:GEMINI_API_KEY = $persisted }
-    }
-    catch {
-        # Non-Windows or restricted environment: fall through silently. Gemini
-        # will report unavailable via its own missing-key error, same as today.
-    }
-}
-
 # See AGENTS.md "Cross-model code review" for the contract this script implements:
 # a commit range is reviewed by the model that did NOT author it, and merge-pr.ps1
 # refuses to merge until that reviewer's newest verdict on the current head has zero
@@ -153,7 +135,7 @@ function Invoke-Reviewer {
         [Parameter(Mandatory = $true)][ValidateRange(1, 86400)][int]$TimeoutSeconds
     )
     $model = Get-ReviewerModel -Reviewer $Name -Tier $Tier
-    # $null when the CLI has no exposed effort control (currently Gemini) or the
+    # $null when the CLI has no exposed effort control or the
     # tier has no mapped value; the invocation then omits the flag and the CLI
     # uses its own default rather than being passed a guessed-at value.
     $effort = Get-ReviewerEffort -Reviewer $Name -Tier $Tier
@@ -189,17 +171,31 @@ function Invoke-Reviewer {
                 $raw = $result.Stdout
             }
             'gemini' {
-                # --approval-mode plan is Gemini's read-only mode, the analogue of
-                # Claude's --restricted. --skip-trust avoids the folder-trust prompt,
-                # which otherwise downgrades the approval mode in a headless run.
-                # No reasoning-effort flag is exposed by this CLI version, so $effort
-                # (always $null for gemini) is never consulted here.
-                $arguments = @('-m', $model, '-p', '', '--approval-mode', 'plan', '--skip-trust', '-o', 'text') +
-                    @(Get-ReviewerNoMcpArguments -Reviewer gemini)
-                $result = Invoke-BoundedProcess -FilePath 'gemini' -ArgumentList $arguments `
-                    -WorkingDirectory $ReviewRoot -StandardInput $promptText -TimeoutSeconds $TimeoutSeconds
+                # Antigravity CLI on the owner's Google login. --mode plan is its
+                # read-only mode: confirmed 2026-10-20 that a headless plan-mode run
+                # told to write a file, delete one and run a shell command did none
+                # of them (file reads still work). --sandbox adds terminal
+                # restrictions. Never pass --dangerously-skip-permissions. The prompt
+                # goes in on stdin as one stream-json message.
+                # Headless plan mode denies every shell command, and a denied command
+                # ends the turn with an empty answer. Run from the disposable worktree,
+                # Gemini's first move was `git status`, so without this preamble every
+                # review came back empty (confirmed 2026-10-20; with it, two runs used
+                # only file reads and returned a verdict).
+                $promptText = 'Shell commands are disabled in this review: any command, including git, ' +
+                    'is denied and ends the review with no result. Do not run commands. The contract and ' +
+                    'the complete diff are below; read other files in the working directory with your ' +
+                    "file-reading tools if you need context.`n`n" + $promptText
+                $agy = Resolve-AgyCommand
+                Assert-AgyHasNoExtensions -AgyCommand $agy -WorkingDirectory $ReviewRoot
+                $arguments = @('--model', $model, '--mode', 'plan', '--sandbox',
+                    '--input-format', 'stream-json', '--output-format', 'stream-json')
+                if ($effort) { $arguments += @('--effort', $effort) }
+                $result = Invoke-BoundedProcess -FilePath $agy -ArgumentList $arguments `
+                    -WorkingDirectory $ReviewRoot -StandardInput (New-AgyStreamInput -Prompt $promptText) `
+                    -TimeoutSeconds $TimeoutSeconds
                 $exitCode = $result.ExitCode
-                $raw = $result.Stdout
+                $raw = if ($exitCode -eq 0) { Get-AgyStreamResult -Stdout $result.Stdout -ExpectedModel $model } else { $result.Stdout }
             }
             'grok' {
                 # No CLI: the xAI API answers from the prompt alone, so it has no

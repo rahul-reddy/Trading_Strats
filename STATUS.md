@@ -23,12 +23,14 @@ quotes. First paper run is 2026-10-20 15:30 ET.
   drawdown halt, max_order_value) and for the IBKR account-type check.
 - Live: store the new IBKR live user's login once IBKR approves it, deploy, approve the push,
   run ibkr-check. Confirm whether the gateway resends a missed 2FA push.
-- Gemini reviewer: needs `~/.gemini/settings.json` with gemini-api-key auth (and possibly Cloud
-  Billing for the pinned model). Grok: needs XAI_API_KEY in this repo's .env.
 
 **Next action:** check the 15:30 paper run (`/opt/trading/state/ibkr-paper/runs.jsonl`, trades.csv).
 
 ## History
+
+- 2026-10-20: Gemini reviewer moved to the Antigravity CLI (agy, Google login): pinned
+  gemini-3.8-flash-high, plan mode + sandbox, prompt on stdin. Verified end to end: approves a
+  clean change, blocks a planted CAGR sign bug. Still excluded from critical-tier diffs (Flash only).
 
 - 2026-10-20: Found the gitleaks secret scan had never run on a PR (missing pull-requests: read and
   a shallow checkout; hidden by continue-on-error). Fixed with the Dependabot action bumps (checkout, setup-uv,
