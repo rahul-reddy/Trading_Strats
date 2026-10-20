@@ -448,6 +448,10 @@ function Get-AgyStreamResult {
     if ($result.status -ne 'SUCCESS') {
         throw "agy finished with status '$($result.status)': $($result.error)"
     }
+    $denied = @($result.denied_actions | Where-Object { $_ } | ForEach-Object { $_.display_name })
+    if ([string]::IsNullOrWhiteSpace([string]$result.response) -and $denied.Count) {
+        throw "agy tried a denied action ($($denied -join ', ')) and returned no review"
+    }
     [string]$result.response
 }
 

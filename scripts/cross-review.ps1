@@ -177,6 +177,15 @@ function Invoke-Reviewer {
                 # of them (file reads still work). --sandbox adds terminal
                 # restrictions. Never pass --dangerously-skip-permissions. The prompt
                 # goes in on stdin as one stream-json message.
+                # Headless plan mode denies every shell command, and a denied command
+                # ends the turn with an empty answer. Run from the disposable worktree,
+                # Gemini's first move was `git status`, so without this preamble every
+                # review came back empty (confirmed 2026-10-20; with it, two runs used
+                # only file reads and returned a verdict).
+                $promptText = 'Shell commands are disabled in this review: any command, including git, ' +
+                    'is denied and ends the review with no result. Do not run commands. The contract and ' +
+                    'the complete diff are below; read other files in the working directory with your ' +
+                    "file-reading tools if you need context.`n`n" + $promptText
                 $agy = Resolve-AgyCommand
                 Assert-AgyHasNoExtensions -AgyCommand $agy -WorkingDirectory $ReviewRoot
                 $arguments = @('--model', $model, '--mode', 'plan', '--sandbox',

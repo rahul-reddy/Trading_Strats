@@ -275,6 +275,8 @@ $agyCases = [ordered]@{
     'error status' = @("$agyInit`n$agyError", 'gemini-3.8-flash-high', "status 'ERROR'")
     'no init'      = @($agyOk, 'gemini-3.8-flash-high', 'no init event')
     'no result'    = @($agyInit, 'gemini-3.8-flash-high', 'no result event')
+    'denied, empty' = @("$agyInit`n" + '{"event":"result","result":{"status":"SUCCESS","response":"","denied_actions":[{"action":"command","display_name":"RunCommand"}]}}',
+        'gemini-3.8-flash-high', 'denied action (RunCommand)')
 }
 foreach ($case in $agyCases.GetEnumerator()) {
     $message = ''
