@@ -30,8 +30,8 @@ quotes. First paper run is 2026-10-20 15:30 ET.
 
 ## History
 
-- 2026-10-20: Found the gitleaks secret scan had never run on a PR (missing pull-requests: read;
-  hidden by continue-on-error). Fixed with the Dependabot action bumps (checkout, setup-uv,
+- 2026-10-20: Found the gitleaks secret scan had never run on a PR (missing pull-requests: read and
+  a shallow checkout; hidden by continue-on-error). Fixed with the Dependabot action bumps (checkout, setup-uv,
   upload-artifact, gitleaks-action) in one PR. tzdata 2026.5 merged from Dependabot (#6).
 
 - 2026-10-20: AWS deployment (scheduled EC2, IB Gateway + IBC in Docker, SSM secrets), Finviz
