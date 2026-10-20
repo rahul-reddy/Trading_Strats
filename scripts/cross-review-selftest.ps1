@@ -297,7 +297,12 @@ foreach ($case in $agyCases.GetEnumerator()) {
     Assert-Equal ($message -match [regex]::Escape($case.Value[2])) $true "agy fails closed: $($case.Key)"
 }
 Assert-Equal (@(Get-AuthorModelsFromMessages -CommitMessages `
-    "change`n`nCo-Authored-By: Antigravity <noreply@google.com>")[0]) 'gemini' 'antigravity author is gemini'
+    "change`n`nCo-Authored-By: Antigravity Agent <agent@antigravity.dev>")[0]) 'gemini' 'antigravity author is gemini'
+Assert-Equal (Test-AgyListingEmpty -Stdout "No MCP servers configured.`n" -Expected 'No MCP servers configured.') $true `
+    'agy empty MCP listing'
+Assert-Equal (Test-AgyListingEmpty -Stdout "rea  enabled`nNo MCP servers configured.`n" `
+    -Expected 'No MCP servers configured.') $false 'agy listing naming a server is not empty'
+Assert-Equal (Test-AgyListingEmpty -Stdout '' -Expected 'No plugins installed.') $false 'agy empty output is not proof'
 Assert-Equal @(Get-ReviewerNoMcpArguments -Reviewer grok).Count 0 'grok has no MCP servers'
 Assert-Equal @(Get-ReviewerNoMcpArguments -Reviewer codex).Count 0 'codex with nothing configured'
 Assert-Equal ((Get-ReviewerNoMcpArguments -Reviewer codex -CodexServerNames @('rea', 'my_tool-2')) -join ' ') `
