@@ -47,7 +47,7 @@
     {
       "Sid": "Secrets",
       "Effect": "Allow",
-      "Action": [ "ssm:PutParameter", "ssm:GetParameter", "ssm:GetParameters", "ssm:DeleteParameter", "ssm:DescribeParameters" ],
+      "Action": [ "ssm:PutParameter", "ssm:GetParameter", "ssm:GetParameters", "ssm:DeleteParameter", "ssm:DeleteParameters", "ssm:DescribeParameters" ],
       "Resource": [ "arn:aws:ssm:us-east-1:*:parameter/trading/*", "arn:aws:ssm:us-east-1::parameter/aws/service/*" ]
     },
     {
