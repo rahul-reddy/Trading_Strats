@@ -28,6 +28,7 @@ Resources:
   Bucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain         # holds the state backups (trade logs, ledgers)
+    UpdateReplacePolicy: Retain
     Properties:
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true

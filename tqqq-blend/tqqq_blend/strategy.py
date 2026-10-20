@@ -16,6 +16,7 @@ Volatility target: the blended net long is scaled by min(1, vol_target / QQQ 20-
 Positive net -> TQQQ weight, negative net -> SQQQ weight. Signals use the close of day t and are
 meant to be executed in the last minutes of day t (both traders act near the close).
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -93,7 +94,7 @@ def mr_sleeve(d: pd.DataFrame, c: StrategyConfig) -> np.ndarray:
 
 def vibha_sleeve(d: pd.DataFrame, c: StrategyConfig) -> pd.DataFrame:
     """Path-dependent state machine. Returns exposure plus diagnostics per day."""
-    o, h, l, cl, v = (d[k].to_numpy() for k in ("open", "high", "low", "close", "volume"))
+    o, h, lo, cl, v = (d[k].to_numpy() for k in ("open", "high", "low", "close", "volume"))
     sma_s, ema_x, sma_r = d["sma_short"].to_numpy(), d["ema_exit"].to_numpy(), d["sma_reclaim"].to_numpy()
     hi52, vavg, slow = d["hi_52w"].to_numpy(), d["vol_avg"].to_numpy(), d["sma_slow"].to_numpy()
     n = len(d)
@@ -118,8 +119,8 @@ def vibha_sleeve(d: pd.DataFrame, c: StrategyConfig) -> pd.DataFrame:
 
         # Rally-attempt bookkeeping (only while light): undercutting the low resets the count.
         if exp <= 0.5:
-            if l[i] < attempt_low:
-                attempt_low, day1 = l[i], None
+            if lo[i] < attempt_low:
+                attempt_low, day1 = lo[i], None
             elif day1 is None and chg > 0:
                 day1 = i
 
@@ -127,8 +128,9 @@ def vibha_sleeve(d: pd.DataFrame, c: StrategyConfig) -> pd.DataFrame:
         # ---------------- sells first ----------------
         f_new_high_weak = not np.isnan(hi52[i]) and cl[i] >= hi52[i] and v[i] < vavg[i]
         three_down = cl[i] < cl[i - 1] < cl[i - 2] < cl[i - 3]
-        f_three_down_vol = (three_down and v[i] > v[i - 1] > v[i - 2]
-                            and h[i] < h[i - 1] < h[i - 2] and l[i] < l[i - 1] < l[i - 2])
+        f_three_down_vol = (
+            three_down and v[i] > v[i - 1] > v[i - 2] and h[i] < h[i - 1] < h[i - 2] and lo[i] < lo[i - 1] < lo[i - 2]
+        )
         f_lost_10 = cl[i] < sma_s[i] and higher_vol
         flags = int(f_new_high_weak) + int(nd >= c.dist_warn) + int(three_down) + int(f_lost_10) + int(f_three_down_vol)
 
@@ -137,7 +139,7 @@ def vibha_sleeve(d: pd.DataFrame, c: StrategyConfig) -> pd.DataFrame:
             if cl[i] < ema_x[i]:
                 exp, exited = 0.0, True
                 ev.append("exit<21ema")
-                attempt_low, day1 = l[i], None
+                attempt_low, day1 = lo[i], None
             else:
                 if flags >= c.flags_to_trim and flags > prev_flags:
                     exp *= 1 - c.trim_fraction
@@ -149,10 +151,15 @@ def vibha_sleeve(d: pd.DataFrame, c: StrategyConfig) -> pd.DataFrame:
 
         # ---------------- buys ----------------
         if not exited:
-            is_ftd = (day1 is not None and i - day1 + 1 >= c.ftd_min_day
-                      and chg >= c.ftd_min_gain and higher_vol and exp <= 0.5)
+            is_ftd = (
+                day1 is not None
+                and i - day1 + 1 >= c.ftd_min_day
+                and chg >= c.ftd_min_gain
+                and higher_vol
+                and exp <= 0.5
+            )
             k = c.hhhl_days
-            hhhl = all(h[i - j] > h[i - j - 1] and l[i - j] > l[i - j - 1] for j in range(k))
+            hhhl = all(h[i - j] > h[i - j - 1] and lo[i - j] > lo[i - j - 1] for j in range(k))
             if is_ftd:
                 exp = 1.0
                 dist = []
@@ -176,8 +183,9 @@ def vibha_sleeve(d: pd.DataFrame, c: StrategyConfig) -> pd.DataFrame:
             attempt_low, day1 = np.inf, None
 
         exp_arr[i], flags_arr[i], event[i] = exp, flags, ",".join(ev)
-    return pd.DataFrame({"vibha": exp_arr, "dist_days": nd_arr, "sell_flags": flags_arr,
-                         "vibha_event": event}, index=d.index)
+    return pd.DataFrame(
+        {"vibha": exp_arr, "dist_days": nd_arr, "sell_flags": flags_arr, "vibha_event": event}, index=d.index
+    )
 
 
 def compute_signals(df: pd.DataFrame, c: StrategyConfig) -> pd.DataFrame:

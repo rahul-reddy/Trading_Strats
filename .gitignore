@@ -20,3 +20,12 @@ venv/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Agent harness: local review audit records
+.local/
+
+# Tooling output
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml

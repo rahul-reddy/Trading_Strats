@@ -12,10 +12,15 @@ Systematic trading strategies, one folder per strategy. Each folder is self-cont
    - `README.md`: setup and how to run
    - `STRATEGY.md`: the exact rules, sources, and backtest results
    - `WORKFLOW.md`: plain-language walkthrough and operating routine
-   - `config.toml`, `requirements.txt`, `tests/`
+   - `config.toml`, `tests/`, and a `pyproject.toml` with a `uv.lock` (CI finds every folder that has one)
 2. Keep runtime files (data cache, backtest output, broker tokens, trade logs) in `<strategy-name>/state/`, which is git-ignored.
 3. Never commit API keys or broker tokens. Use environment variables.
-4. Add a row to the table above.
+4. Add a row to the table above and to docs/PLAN.md.
+5. If it has a `deploy/` folder, add it to `.github/dependabot.yml`.
+
+## How changes land
+
+Every change goes through a short branch, CI, a review by a second AI model, and `scripts/merge-pr.ps1`. The rules are in [AGENTS.md](AGENTS.md); the current state is in [STATUS.md](STATUS.md).
 
 ## Conventions
 

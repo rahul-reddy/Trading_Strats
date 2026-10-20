@@ -29,10 +29,10 @@ state/                      runtime files: cache, state.json, trades.csv, runs.j
 
 ```powershell
 cd C:\dev_projects\Trading_Strats\tqqq-blend
-pip install -r requirements.txt
-python -m pytest -q
-python -m tqqq_blend backtest                 # full history; writes CSVs to state/backtest
-python -m tqqq_blend signal                   # last 15 days of sleeve diagnostics
+uv sync --locked                              # installs exactly what uv.lock pins, into .venv
+uv run pytest
+uv run python -m tqqq_blend backtest          # full history; writes CSVs to state/backtest
+uv run python -m tqqq_blend signal            # last 15 days of sleeve diagnostics
 ```
 
 ## Going live in stages

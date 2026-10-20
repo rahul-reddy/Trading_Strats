@@ -5,6 +5,7 @@ callback URL matching config (default https://127.0.0.1:8182). Put the keys in e
 SCHWAB_API_KEY and SCHWAB_APP_SECRET. Run `python -m tqqq_blend schwab-login` once to create the
 token file. Schwab refresh tokens expire after 7 days, so re-run the login weekly.
 """
+
 from __future__ import annotations
 
 import os
@@ -22,12 +23,14 @@ class SchwabBroker:
 
     def connect(self, interactive: bool = False):
         from schwab import auth
+
         key, secret = os.environ.get("SCHWAB_API_KEY"), os.environ.get("SCHWAB_APP_SECRET")
         if not key or not secret:
             raise RuntimeError("Set SCHWAB_API_KEY and SCHWAB_APP_SECRET environment variables")
         if interactive:
-            self.client = auth.client_from_login_flow(key, secret, self.cfg.schwab_callback_url,
-                                                      self.cfg.schwab_token_path)
+            self.client = auth.client_from_login_flow(
+                key, secret, self.cfg.schwab_callback_url, self.cfg.schwab_token_path
+            )
         else:
             self.client = auth.client_from_token_file(self.cfg.schwab_token_path, key, secret)
         accts = self.client.get_account_numbers()
@@ -62,6 +65,7 @@ class SchwabBroker:
     def place(self, order: Order) -> str:
         from schwab.orders.common import Duration, OrderType, Session
         from schwab.orders.equities import equity_buy_market, equity_sell_market
+
         spec = (equity_buy_market if order.side == "BUY" else equity_sell_market)(order.symbol, order.quantity)
         spec.set_duration(Duration.DAY).set_session(Session.NORMAL)
         if order.order_type == "MOC":
@@ -69,4 +73,5 @@ class SchwabBroker:
         r = self.client.place_order(self.account_hash, spec)
         r.raise_for_status()
         from schwab.utils import Utils
+
         return f"schwab#{Utils(self.client, self.account_hash).extract_order_id(r)}"

@@ -1,0 +1,13 @@
+# Weekly update PRs. They carry no AI trailer, so they need CI but not a cross-review;
+# still read the changelog before merging anything that touches a broker library.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: uv
+    directory: /tqqq-blend
+    schedule: { interval: weekly }
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]

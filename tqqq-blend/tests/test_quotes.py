@@ -19,8 +19,10 @@ def fake_urlopen(body):
     class Resp(io.BytesIO):
         def __enter__(self):
             return self
+
         def __exit__(self, *a):
             self.close()
+
     return lambda req, timeout: Resp(body.encode())
 
 
@@ -56,11 +58,21 @@ def test_get_prices_falls_back_to_broker_without_token(monkeypatch):
 
 def test_live_signal_bars_patches_todays_bar_with_int_volume(monkeypatch):
     import pandas as pd
+
     from tqqq_blend import data
+
     today = pd.Timestamp.now(tz="America/New_York").normalize()
     idx = pd.DatetimeIndex([today - pd.Timedelta(days=1), today])
-    raw = pd.DataFrame({"Open": [700.0, 701.0], "High": [705.0, 702.0], "Low": [695.0, 699.0],
-                        "Close": [701.0, 700.0], "Volume": [40_000_000, 15_654_631]}, index=idx)
+    raw = pd.DataFrame(
+        {
+            "Open": [700.0, 701.0],
+            "High": [705.0, 702.0],
+            "Low": [695.0, 699.0],
+            "Close": [701.0, 700.0],
+            "Volume": [40_000_000, 15_654_631],
+        },
+        index=idx,
+    )
     monkeypatch.setattr(data.yf, "Ticker", lambda s: type("T", (), {"history": lambda self, **k: raw})())
     df = data.live_signal_bars("QQQ", 710.0, 1.15)
     last = df.iloc[-1]

@@ -1,9 +1,0 @@
-pandas>=2.2
-numpy>=1.26
-yfinance>=0.2.50
-pandas_market_calendars>=4.4
-tzdata
-pytest
-# brokers (install the one you use)
-ib_async>=1.0
-schwab-py>=1.4

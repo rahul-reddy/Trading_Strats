@@ -9,6 +9,7 @@ On connect the account is checked against `ibkr_account_type`: paper account IDs
 (DU1234567), live ones don't. A mismatch disconnects and raises, so a port mix-up can't send orders
 meant for the paper account to a live one.
 """
+
 from __future__ import annotations
 
 import math
@@ -31,15 +32,23 @@ class IBKRBroker:
 
     def connect(self, readonly: bool = False, client_id: int | None = None):
         from ib_async import IB
+
         want = self.cfg.ibkr_account_type.lower()
         if want not in ("paper", "live"):
             raise ValueError(f"ibkr_account_type must be 'paper' or 'live', not '{want}'")
         if self.cfg.ibkr_port in (LIVE_PORTS if want == "paper" else PAPER_PORTS):
-            raise ValueError(f"ibkr_port {self.cfg.ibkr_port} is a standard {'live' if want == 'paper' else 'paper'} "
-                             f"port but ibkr_account_type is '{want}'")
+            raise ValueError(
+                f"ibkr_port {self.cfg.ibkr_port} is a standard {'live' if want == 'paper' else 'paper'} "
+                f"port but ibkr_account_type is '{want}'"
+            )
         self.ib = IB()
-        self.ib.connect(self.cfg.ibkr_host, self.cfg.ibkr_port, timeout=15, readonly=readonly,
-                        clientId=self.cfg.ibkr_client_id if client_id is None else client_id)
+        self.ib.connect(
+            self.cfg.ibkr_host,
+            self.cfg.ibkr_port,
+            timeout=15,
+            readonly=readonly,
+            clientId=self.cfg.ibkr_client_id if client_id is None else client_id,
+        )
         acct, on_login = self._account(), self.ib.managedAccounts()
         if acct not in on_login:
             self.disconnect()
@@ -58,6 +67,7 @@ class IBKRBroker:
     def _contract(self, symbol):
         if symbol not in self._contracts:
             from ib_async import Stock
+
             c = Stock(symbol, "SMART", "USD")
             self.ib.qualifyContracts(c)
             self._contracts[symbol] = c
@@ -86,7 +96,9 @@ class IBKRBroker:
         return float(px)
 
     def place(self, order: Order) -> str:
-        from ib_async import MarketOrder, Order as IBOrder
+        from ib_async import MarketOrder
+        from ib_async import Order as IBOrder
+
         if order.order_type == "MOC":
             o = IBOrder(action=order.side, totalQuantity=order.quantity, orderType="MOC")
         else:
@@ -104,14 +116,24 @@ class IBKRBroker:
         quotes = {}
         for sym in ("QQQ", "TQQQ", "SQQQ"):
             [t] = self.ib.reqTickers(self._contract(sym))
-            quotes[sym] = {"price": t.marketPrice(), "bid": t.bid, "ask": t.ask, "prev_close": t.close,
-                           "data": DATA_TYPES.get(getattr(t, "marketDataType", 0), "unknown")}
+            quotes[sym] = {
+                "price": t.marketPrice(),
+                "bid": t.bid,
+                "ask": t.ask,
+                "prev_close": t.close,
+                "data": DATA_TYPES.get(getattr(t, "marketDataType", 0), "unknown"),
+            }
         return {
-            "accounts_on_login": self.ib.managedAccounts(), "account": acct, "account_type": self.account_type,
-            "net_liquidation": summary.get("NetLiquidation"), "cash": summary.get("TotalCashValue"),
+            "accounts_on_login": self.ib.managedAccounts(),
+            "account": acct,
+            "account_type": self.account_type,
+            "net_liquidation": summary.get("NetLiquidation"),
+            "cash": summary.get("TotalCashValue"),
             "buying_power": summary.get("BuyingPower"),
             "positions": {p.contract.symbol: p.position for p in self.ib.positions(acct) if p.position},
-            "open_orders": [f"{t.order.action} {t.order.totalQuantity} {t.contract.symbol} {t.order.orderType}"
-                            for t in self.ib.openTrades()],
+            "open_orders": [
+                f"{t.order.action} {t.order.totalQuantity} {t.contract.symbol} {t.order.orderType}"
+                for t in self.ib.openTrades()
+            ],
             "quotes": quotes,
         }

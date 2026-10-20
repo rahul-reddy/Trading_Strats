@@ -1,5 +1,6 @@
 """Local paper broker: fills instantly at the live price, persisted to state/paper_account.json.
 Use it to forward-test the full daily process before connecting a real account."""
+
 from __future__ import annotations
 
 import json

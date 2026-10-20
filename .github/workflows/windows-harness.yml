@@ -1,0 +1,43 @@
+name: Windows harness
+# Windows minutes cost twice Linux minutes, and this job checks only the
+# PowerShell review/merge harness, which lives entirely under scripts/. It runs
+# when those files (or this workflow) change. merge-pr.ps1 does not require it;
+# the Linux CI job runs the same self-test on every non-docs change.
+on:
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/windows-harness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/windows-harness.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-harness-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  harness-windows:
+    name: Verify harness on Windows
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: pwsh -NoProfile -File scripts/cross-review-selftest.ps1
+      - name: Parse every PowerShell script
+        shell: pwsh
+        run: |
+          foreach ($script in Get-ChildItem scripts -Filter *.ps1 -Recurse) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $script.FullName, [ref]$tokens, [ref]$errors
+            )
+            if ($errors.Count) {
+              $errors | ForEach-Object { Write-Error "$($script.Name): $_" }
+              exit 1
+            }
+          }

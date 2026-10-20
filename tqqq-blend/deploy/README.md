@@ -42,7 +42,7 @@ deploy/
   aws/stack.yml                 instance, IAM role, security group, S3 bucket (releases + state backups)
   aws/deploy-user-policy.json   permissions for the trading-deploy IAM user that runs everything below
   Dockerfile, docker-compose.yml
-  push.sh                       bundle -> S3 -> SSM Run Command -> server/install.sh
+  push.sh                       merged commit -> git archive -> S3 -> SSM Run Command -> server/install.sh
   server/install.sh             installs Docker, pulls secrets from SSM, starts gateways, enables timers
   server/*.service, *.timer     paper runs (orders on), live runs (dry run), daily state backup
 ```
@@ -116,7 +116,9 @@ The 16:45 stop schedule turns the server off. To stop it sooner, run `aws ec2 st
 
 ## Day to day
 
-- **Updating the code:** run `deploy/push.sh` after changing anything. It ships the working tree, not the last commit.
+- **Updating the code:** merge the change (scripts/merge-pr.ps1), then run `deploy/push.sh` and type `deploy <sha>` when asked.
+  It ships `origin/main` (or the commit you name, e.g. to roll back) via `git archive`, never the working tree, and
+  refuses a commit that isn't on `origin/main`. The server records what it runs in `/opt/trading/app/REVISION`.
 - **Logs:**
   - per account: `/opt/trading/state/ibkr-{paper,live}/` holds `tqqq_blend.log`, `runs.jsonl` and `trades.csv`
   - timers: `journalctl -u tqqq-paper`
