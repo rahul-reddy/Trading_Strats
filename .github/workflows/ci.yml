@@ -110,7 +110,7 @@ jobs:
             dir=${dockerfile%%/*}
             docker build --quiet -f "$dockerfile" -t "$dir:ci" "$dir"
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always() && steps.scope.outputs.docs_only != 'true'
         with:
           name: verification-evidence
