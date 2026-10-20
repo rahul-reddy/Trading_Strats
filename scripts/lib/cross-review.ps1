@@ -14,6 +14,12 @@
 # fallback is whichever of Codex/Claude did NOT write the commits -- never
 # the one that did, and never both tried when one already completed a review.
 #
+# Gemini runs through the Antigravity CLI (agy) on the owner's Google login
+# (owner decision, 2026-10-20). The Gemini CLI's API-key path had been
+# unavailable for every review (429: no quota for the pinned Pro model), and
+# Google login no longer works in that CLI. Antigravity offers Gemini 3.8 Flash
+# only, so Gemini is NOT eligible on critical-tier diffs ($CriticalTierExcluded).
+#
 # Grok is last on purpose (owner decision, 2026-09-30): a backup reached only
 # when every other eligible reviewer is unavailable, so one provider's outage or
 # quota never leaves the gate with nobody to ask. It is frontier-class (pinned
@@ -105,9 +111,9 @@ function Invoke-BoundedProcess {
 }
 
 # The model each reviewer must use, by tier. None of these CLIs guarantee a
-# specific model on their own: Gemini resolves its model from GEMINI_MODEL or
-# auto-routes simple prompts to Flash, and Codex takes its default from a
-# mutable ~/.codex/config.toml. Either could silently answer with a different
+# specific model on their own: Antigravity's agy uses whatever model its IDE
+# last selected, and Codex takes its default from a mutable
+# ~/.codex/config.toml. Either could silently answer with a different
 # model than intended, whose APPROVE would still satisfy the merge gate.
 # Command-line arguments outrank both, so the invocation pins the model
 # explicitly. A pinned model the account cannot use makes the CLI fail, which
@@ -116,13 +122,25 @@ function Invoke-BoundedProcess {
 # Codex ran a DIFFERENT, lesser base model (gpt-5.6-sol) on critical-tier
 # diffs briefly (2026-09-14); the owner reverted this back to gpt-6-astra
 # ("most capable") at every tier the same day, so only effort now varies by
-# tier for Codex, same as Gemini and Claude (see Get-ReviewerEffort).
+# tier for Codex, same as Claude (see Get-ReviewerEffort).
+#
+# Gemini's agy model names carry the thinking level (gemini-3.8-flash-high /
+# -medium / -low; `agy models` lists them). Its critical entry keeps the table
+# complete; Gemini never reviews a critical diff ($CriticalTierExcluded), and a
+# forced `-Reviewer gemini` there is refused as not eligible.
+# agy reports the model it actually loaded in its init event, and the review
+# fails closed if that differs from the pin (Get-AgyStreamResult).
 # Update these when the providers rename their models.
 $script:ReviewerModels = @{
-    critical = @{ codex = 'gpt-6-astra'; gemini = 'gemini-3-pro-preview'; claude = 'opus'; grok = 'grok-4.7' }
-    standard = @{ codex = 'gpt-6-astra'; gemini = 'gemini-3-pro-preview'; claude = 'opus'; grok = 'grok-4.7' }
-    low      = @{ codex = 'gpt-6-astra'; gemini = 'gemini-3-pro-preview'; claude = 'opus'; grok = 'grok-4.7' }
+    critical = @{ codex = 'gpt-6-astra'; gemini = 'gemini-3.8-flash-high'; claude = 'opus'; grok = 'grok-4.7' }
+    standard = @{ codex = 'gpt-6-astra'; gemini = 'gemini-3.8-flash-high'; claude = 'opus'; grok = 'grok-4.7' }
+    low      = @{ codex = 'gpt-6-astra'; gemini = 'gemini-3.8-flash-medium'; claude = 'opus'; grok = 'grok-4.7' }
 }
+
+# Reviewers that may not decide a critical-tier diff, whatever their effort.
+# Gemini is limited to Flash through Antigravity; AGENTS.md says a lighter model
+# must never be the sole reviewer of a critical path (owner decision, 2026-10-20).
+$script:CriticalTierExcluded = @('gemini')
 
 function Get-ReviewerModel {
     param(
@@ -255,10 +273,13 @@ function Get-BlastRadiusTier {
 # A GitHub-API version of this existed here briefly and was removed after a
 # cross-review of the change that added it found this gap.
 
-# Per-CLI effort flags by tier. Gemini has no reasoning-effort/thinking-budget
-# flag exposed by this CLI version, so it always runs at its own default; only
-# Codex and Claude are tuned. A tier/reviewer with no entry runs at the CLI's
+# Per-CLI effort flags by tier. A tier/reviewer with no entry runs at the CLI's
 # own default rather than guessing at a flag value that might not be valid.
+#
+# Gemini via agy takes --effort (low|medium|high|xhigh|max), confirmed live
+# 2026-10-20 with gemini-3.8-flash-high. It matches the thinking level already in
+# the pinned model name. Being in this table no longer makes a reviewer
+# critical-eligible; $CriticalTierExcluded decides that.
 #
 # Owner-chosen cost/quality trade-off (2026-09-14, revised same day): Codex
 # runs gpt-6-astra at 'low' ("light") effort across every tier -- the
@@ -271,9 +292,9 @@ function Get-BlastRadiusTier {
 # for 'low' and 'high') runs 'high' except on low-tier diffs: as a last-resort
 # reviewer it is rarely reached, so the extra cost buys scrutiny when it matters.
 $script:ReviewerEffort = @{
-    critical = @{ codex = 'low'; claude = 'medium'; grok = 'high' }
-    standard = @{ codex = 'low'; claude = 'medium'; grok = 'high' }
-    low      = @{ codex = 'low'; claude = 'low'; grok = 'low' }
+    critical = @{ codex = 'low'; claude = 'medium'; grok = 'high'; gemini = 'high' }
+    standard = @{ codex = 'low'; claude = 'medium'; grok = 'high'; gemini = 'high' }
+    low      = @{ codex = 'low'; claude = 'low'; grok = 'low'; gemini = 'medium' }
 }
 
 function Get-ReviewerEffort {
@@ -297,14 +318,13 @@ function Get-ReviewerEffort {
 # not start with it:
 # - claude: --strict-mcp-config with no --mcp-config loads nothing, including
 #   claude.ai connectors.
-# - gemini: --allowed-mcp-server-names admits only the named servers; the name
-#   below matches none.
+# - gemini (agy): has no per-run switch. Assert-AgyHasNoExtensions refuses to
+#   review (reviewer unavailable) unless `agy mcp list` and `agy plugin list`
+#   report none configured.
 # - codex: `-c mcp_servers={}` MERGES rather than replaces, so it disables
 #   nothing. Each configured server is disabled by name instead
 #   (Get-CodexMcpDisableArguments); the names come from `codex mcp list --json`.
 # Grok runs over the xAI API and loads no MCP servers at all.
-$script:GeminiNoMcpServerName = '__cross_review_no_mcp__'
-
 function Get-ReviewerNoMcpArguments {
     param(
         [Parameter(Mandatory = $true)][string]$Reviewer,
@@ -312,7 +332,7 @@ function Get-ReviewerNoMcpArguments {
     )
     switch ($Reviewer) {
         'claude' { return @('--strict-mcp-config') }
-        'gemini' { return @('--allowed-mcp-server-names', $script:GeminiNoMcpServerName) }
+        'gemini' { return @() }  # checked by Assert-AgyHasNoExtensions instead
         'codex' { return @(Get-CodexMcpDisableArguments -ServerNames $CodexServerNames) }
         'grok' { return @() }
         default { throw "Unknown reviewer '$Reviewer'" }
@@ -355,6 +375,82 @@ function Get-CodexMcpServerNames {
     })
 }
 
+# The Antigravity CLI installs to ~/.gemini/bin/agy.exe and is often not on PATH
+# in a session opened before the install. Prefer PATH, then that location.
+function Resolve-AgyCommand {
+    $onPath = Get-Command 'agy' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($onPath) { return $onPath.Source }
+    foreach ($name in @('agy.exe', 'agy')) {
+        $candidate = Join-Path (Join-Path $HOME '.gemini') (Join-Path 'bin' $name)
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
+    throw 'Antigravity CLI (agy) not found on PATH or in ~/.gemini/bin; install Google Antigravity'
+}
+
+# agy has no per-run flag to skip MCP servers or plugins, so refuse to review
+# while any are configured: the reviewer reports unavailable rather than run
+# with tools that reach outside the repository.
+function Assert-AgyHasNoExtensions {
+    param(
+        [Parameter(Mandatory = $true)][string]$AgyCommand,
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [ValidateRange(1, 86400)][int]$TimeoutSeconds = 60
+    )
+    $checks = @(
+        @{ Arguments = @('mcp', 'list'); Expected = 'No MCP servers configured' }
+        @{ Arguments = @('plugin', 'list'); Expected = 'No plugins installed' }
+    )
+    foreach ($check in $checks) {
+        $listing = Invoke-BoundedProcess -FilePath $AgyCommand -ArgumentList $check.Arguments `
+            -WorkingDirectory $WorkingDirectory -StandardInput '' -TimeoutSeconds $TimeoutSeconds
+        $text = ($listing.Stdout + "`n" + $listing.Stderr)
+        if ($listing.ExitCode -ne 0 -or $text -notmatch [regex]::Escape($check.Expected)) {
+            throw "agy $($check.Arguments -join ' ') reports extensions or failed; a review needs none. Output: $($text.Trim())"
+        }
+    }
+}
+
+# One stream-json input line carrying the whole prompt on stdin: `agy -p` takes
+# the prompt only as an argument, too short on Windows for a full diff.
+function New-AgyStreamInput {
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Prompt)
+    (ConvertTo-Json -Compress -Depth 4 -InputObject ([ordered]@{
+                event   = 'user'
+                message = [ordered]@{ content = $Prompt }
+            })) + "`n"
+}
+
+# Parses agy's --output-format stream-json output (one JSON event per line).
+# Fails closed: the init event must name exactly the pinned model, and the run
+# must end in a result event with status SUCCESS. agy exits 0 on some errors
+# (an empty prompt, for one) with status ERROR, so the exit code alone is not
+# enough.
+function Get-AgyStreamResult {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Stdout,
+        [Parameter(Mandatory = $true)][string]$ExpectedModel
+    )
+    $initModel = $null
+    $result = $null
+    foreach ($line in ($Stdout -split "`r?`n")) {
+        $trimmed = $line.Trim()
+        if (-not $trimmed.StartsWith('{')) { continue }
+        try { $evt = $trimmed | ConvertFrom-Json -ErrorAction Stop }
+        catch { continue }
+        if ($evt.event -eq 'init' -and $null -eq $initModel) { $initModel = [string]$evt.init.model }
+        elseif ($evt.event -eq 'result') { $result = $evt.result }
+    }
+    if ($null -eq $initModel) { throw 'agy reported no init event, so the model it used is unknown' }
+    if ($initModel -ne $ExpectedModel) {
+        throw "agy ran model '$initModel', not the pinned '$ExpectedModel'"
+    }
+    if ($null -eq $result) { throw 'agy produced no result event' }
+    if ($result.status -ne 'SUCCESS') {
+        throw "agy finished with status '$($result.status)': $($result.error)"
+    }
+    [string]$result.response
+}
+
 function New-CrossReviewMarker {
     param(
         [Parameter(Mandatory = $true)][ValidateSet('claude', 'codex', 'gemini', 'grok')][string]$Reviewer,
@@ -375,7 +471,7 @@ function Get-AuthorModelsFromMessages {
     $authors = @()
     if ($CommitMessages -match '(?im)^Co-Authored-By:.*Claude') { $authors += 'claude' }
     if ($CommitMessages -match '(?im)^Co-Authored-By:.*(Codex|OpenAI|GPT)') { $authors += 'codex' }
-    if ($CommitMessages -match '(?im)^Co-Authored-By:.*(Gemini|Google)') { $authors += 'gemini' }
+    if ($CommitMessages -match '(?im)^Co-Authored-By:.*(Gemini|Google|Antigravity)') { $authors += 'gemini' }
     if ($CommitMessages -match '(?im)^Co-Authored-By:.*(Grok|xAI|x\.ai)') { $authors += 'grok' }
     # Return a PLAIN array. Every call site wraps this in @(), and a unary-comma
     # return would make that wrap produce a NESTED array: Authors.Count became 1
@@ -423,14 +519,14 @@ function Get-EligibleReviewers {
     $Authors = @($Authors | ForEach-Object { $_ } | Where-Object { $null -ne $_ })
     $pool = $script:ReviewerPool
     if ($Tier -eq 'critical') {
-        # Gemini's CLI has no effort control (see Get-ReviewerEffort), so with the
-        # pool in Gemini-first order it would normally complete the review alone
-        # on every PR -- including one touching a broker adapter -- since a completed
-        # review stops the search. That leaves the highest-stakes diffs decided by
-        # the one reviewer that never gets escalated, and never checked by a
-        # second model. Restrict critical-tier eligibility to reviewers this
-        # module can actually escalate. Found by cross-review of this change.
-        $pool = $pool | Where-Object { $null -ne (Get-ReviewerEffort -Reviewer $_ -Tier 'critical') }
+        # With the pool in Gemini-first order, Gemini would otherwise complete the
+        # review alone on every PR -- including one touching a broker adapter --
+        # since a completed review stops the search. Through Antigravity it is
+        # limited to a Flash model, which AGENTS.md does not allow as the sole
+        # reviewer of a critical path. This list is explicit on purpose: the
+        # earlier rule ("no effort setting") would have made Gemini eligible the
+        # moment agy gained --effort.
+        $pool = $pool | Where-Object { $_ -notin $script:CriticalTierExcluded }
     }
     $pool | Where-Object { $_ -notin $Authors }
 }

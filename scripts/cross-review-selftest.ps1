@@ -257,8 +257,33 @@ Assert-Equal $timedOut $true 'bounded process timeout'
 # Reviewers run with no MCP servers (see Get-ReviewerNoMcpArguments).
 Assert-Equal ((Get-ReviewerNoMcpArguments -Reviewer claude) -join ' ') '--strict-mcp-config' `
     'claude loads no MCP servers'
-Assert-Equal ((Get-ReviewerNoMcpArguments -Reviewer gemini) -join ' ') `
-    '--allowed-mcp-server-names __cross_review_no_mcp__' 'gemini loads no MCP servers'
+Assert-Equal @(Get-ReviewerNoMcpArguments -Reviewer gemini).Count 0 `
+    'gemini (agy) takes no MCP flag; Assert-AgyHasNoExtensions checks instead'
+
+# Gemini runs through the Antigravity CLI (agy): stdin message shape, and a
+# stream that fails closed on a model swap, an ERROR status or a missing event.
+$agyInput = (New-AgyStreamInput -Prompt "review `"this`"`nline 2") | ConvertFrom-Json
+Assert-Equal "$($agyInput.event)|$($agyInput.message.content)" "user|review `"this`"`nline 2" 'agy stdin message'
+$agyInit = '{"event":"init","init":{"model":"gemini-3.8-flash-high","cwd":"x"}}'
+$agyStep = '{"event":"step_update","step_update":{"state":"DONE"}}'
+$agyOk = '{"event":"result","result":{"status":"SUCCESS","response":"{\"verdict\":\"APPROVE\"}"}}'
+Assert-Equal (Get-AgyStreamResult -Stdout "noise`n$agyInit`n$agyStep`n$agyOk`n" -ExpectedModel 'gemini-3.8-flash-high') `
+    '{"verdict":"APPROVE"}' 'agy result response'
+$agyError = '{"event":"result","result":{"status":"ERROR","response":"","error":"empty prompt"}}'
+$agyCases = [ordered]@{
+    'model swap'   = @("$agyInit`n$agyOk", 'gemini-3.8-flash-low', 'not the pinned')
+    'error status' = @("$agyInit`n$agyError", 'gemini-3.8-flash-high', "status 'ERROR'")
+    'no init'      = @($agyOk, 'gemini-3.8-flash-high', 'no init event')
+    'no result'    = @($agyInit, 'gemini-3.8-flash-high', 'no result event')
+}
+foreach ($case in $agyCases.GetEnumerator()) {
+    $message = ''
+    try { Get-AgyStreamResult -Stdout $case.Value[0] -ExpectedModel $case.Value[1] | Out-Null }
+    catch { $message = $_.Exception.Message }
+    Assert-Equal ($message -match [regex]::Escape($case.Value[2])) $true "agy fails closed: $($case.Key)"
+}
+Assert-Equal (@(Get-AuthorModelsFromMessages -CommitMessages `
+    "change`n`nCo-Authored-By: Antigravity <noreply@google.com>")[0]) 'gemini' 'antigravity author is gemini'
 Assert-Equal @(Get-ReviewerNoMcpArguments -Reviewer grok).Count 0 'grok has no MCP servers'
 Assert-Equal @(Get-ReviewerNoMcpArguments -Reviewer codex).Count 0 'codex with nothing configured'
 Assert-Equal ((Get-ReviewerNoMcpArguments -Reviewer codex -CodexServerNames @('rea', 'my_tool-2')) -join ' ') `
