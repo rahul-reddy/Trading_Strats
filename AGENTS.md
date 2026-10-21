@@ -13,7 +13,7 @@ folder per strategy. Read docs/PLAN.md and STATUS.md before changing behavior.
 ## Workflow
 - main is the integration branch. Use feat/<topic>, fix/<topic>, or docs/<topic> branches and focused commits.
 - Open a PR, run CI, review the diff, then squash merge. Never force-push main.
-- The current GitHub plan does not support branch protection on this private repository. Keep it private. After reviewing the diff, use scripts/merge-pr.ps1 to require successful CI and match the reviewed head SHA.
+- The owner switches this repository between public and private to manage Actions minutes (2026-10-21). Treat it as public at all times: anything pushed while it is public, including PR comments and CI logs, stays exposed. A ruleset on main (no force-push or deletion, changes through a PR with `Verify strategies` passing, squash only) and GitHub secret scanning only take effect while it is public, so the protections that always apply are in the code: scripts/merge-pr.ps1 requires successful CI, matches the reviewed head SHA and counts only verdict comments posted by the repository owner, and CI's gitleaks scan blocks. Never add a self-hosted runner: fork PRs could run code on it. Don't run cross-review.ps1 or merge-pr.ps1 on a PR from someone else without reading it first; with no AI trailer it counts as human-authored and skips review.
 - Preserve unrelated changes. Coordinate file ownership before multiple agents edit the same files.
 - Update STATUS.md with evidence, remaining work and next action in every meaningful handoff.
 - Do not claim tests passed unless you ran them on the current revision.

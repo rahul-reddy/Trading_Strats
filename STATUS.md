@@ -28,6 +28,13 @@ quotes. First paper run is 2026-10-20 15:30 ET.
 
 ## History
 
+- 2026-10-21: Repository made public (it will switch between public and private for Actions
+  minutes). Scan of all history, PR comments and the last 40 CI logs: no secrets or account
+  numbers. Fixed the merge gate trusting verdict markers from any commenter (now owner only, with
+  forgery self-tests), made the gitleaks scan blocking, added a ruleset on main and turned on secret
+  scanning and push protection. Author email in 15 early commits is a personal address
+  (can't be removed without rewriting history); this clone now commits with the noreply address.
+
 - 2026-10-20: Gemini reviewer moved to the Antigravity CLI (agy, Google login): pinned
   gemini-3.8-flash-high, plan mode + sandbox, prompt on stdin. Verified end to end: approves a
   clean change, blocks a planted CAGR sign bug. Owner then allowed it on critical diffs at high effort, in all three repos.

@@ -561,10 +561,17 @@ function Find-CrossReviewComment {
         # real blocking verdict on this head was never consulted. Concurrent
         # cross-review runs can post out of order, so this is reachable.
         # Found by cross-review of this change.
-        [string]$HeadSha
+        [string]$HeadSha,
+        # GitHub logins whose comments may carry a verdict. Anyone who can read
+        # the repository can comment on its PRs (all of GitHub while it is
+        # public), so a marker from any other author is ignored -- otherwise a
+        # forged APPROVE could open the gate, or a newer forged marker could
+        # hide a real rejection. Empty trusts nobody: fail-closed.
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$TrustedAuthors
     )
     $found = @()
     foreach ($c in $Comments) {
+        if ([string]$c.author.login -notin $TrustedAuthors) { continue }
         $m = [regex]::Match($c.body, $script:CrossReviewMarkerPattern)
         if ($m.Success -and $m.Groups['reviewer'].Value -eq $Reviewer -and
             ($HeadSha -eq '' -or $m.Groups['head'].Value -eq $HeadSha)) {
@@ -597,7 +604,10 @@ function Test-CrossReviewSatisfied {
         # a critical-tier diff -- exactly the case Get-EligibleReviewers's
         # -Tier 'critical' branch exists to prevent, in the one function that
         # actually blocks or allows a merge.
-        [ValidateSet('critical', 'standard', 'low')][string]$Tier = 'standard'
+        [ValidateSet('critical', 'standard', 'low')][string]$Tier = 'standard',
+        # Logins allowed to post verdict markers (see Find-CrossReviewComment).
+        # Defaults to nobody, so a caller that forgets it can never merge.
+        [string[]]$TrustedAuthors = @()
     )
     # Normalize defensively against $null, independent of whether every call site
     # remembers to wrap a function's result in @(...). Note @($null) is a
@@ -624,7 +634,8 @@ function Test-CrossReviewSatisfied {
     $problems = @()
     $approvals = @()
     foreach ($r in $eligible) {
-        $verdict = Find-CrossReviewComment -Comments $Comments -Reviewer $r -HeadSha $HeadSha
+        $verdict = Find-CrossReviewComment -Comments $Comments -Reviewer $r -HeadSha $HeadSha `
+            -TrustedAuthors $TrustedAuthors
         if ($null -eq $verdict) { $problems += "$r has not reviewed this head"; continue }
         if ($verdict.Blocking -gt 0 -or $verdict.Verdict -ne 'APPROVE') {
             Write-Host "$r has $($verdict.Blocking) unresolved blocking finding(s) on $HeadSha."

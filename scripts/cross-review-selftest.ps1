@@ -14,9 +14,11 @@ function Review-Comment {
         [string]$Head,
         [string]$Verdict = 'APPROVE',
         [int]$Blocking = 0,
-        [datetime]$CreatedAt = [datetime]::UtcNow
+        [datetime]$CreatedAt = [datetime]::UtcNow,
+        [string]$Author = 'repo-owner'
     )
     [pscustomobject]@{
+        author = [pscustomobject]@{ login = $Author }
         body = New-CrossReviewMarker -Reviewer $Reviewer -HeadSha $Head `
             -Verdict $Verdict -Blocking $Blocking
         createdAt = $CreatedAt.ToString('o')
@@ -25,6 +27,7 @@ function Review-Comment {
 
 $head = '0123456789abcdef0123456789abcdef01234567'
 $oldHead = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+$trusted = @('repo-owner')
 
 Assert-Equal (Get-BlastRadiusTier -ChangedFiles @('docs/guide.md')) 'low' 'docs tier'
 Assert-Equal (Get-BlastRadiusTier -ChangedFiles @('tqqq-blend/README.md')) 'low' 'strategy readme tier'
@@ -44,26 +47,26 @@ Assert-Equal (Get-BlastRadiusTier -ChangedFiles @('tqqq-blend/tests/test_strateg
 Assert-Equal (@(Get-AuthorModelsFromMessages -CommitMessages `
     "change`n`nCo-Authored-By: Codex <noreply@openai.com>")[0]) 'codex' 'author detection'
 
-Assert-Equal (Test-CrossReviewSatisfied -Authors @() -Comments @() -HeadSha $head) $true `
+Assert-Equal (Test-CrossReviewSatisfied -Authors @() -Comments @() -HeadSha $head -TrustedAuthors $trusted) $true `
     'human-authored change'
 Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') `
-    -Comments @(Review-Comment -Reviewer gemini -Head $head) -HeadSha $head) $true `
+    -Comments @(Review-Comment -Reviewer gemini -Head $head) -HeadSha $head -TrustedAuthors $trusted) $true `
     'eligible same-head approval'
 Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') `
-    -Comments @(Review-Comment -Reviewer gemini -Head $oldHead) -HeadSha $head) $false `
+    -Comments @(Review-Comment -Reviewer gemini -Head $oldHead) -HeadSha $head -TrustedAuthors $trusted) $false `
     'stale approval'
 Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') -Comments @(
         Review-Comment -Reviewer gemini -Head $head -CreatedAt ([datetime]::UtcNow.AddMinutes(-1))
         Review-Comment -Reviewer claude -Head $head -Verdict REQUEST_CHANGES -Blocking 1
-    ) -HeadSha $head) $false 'one rejection blocks another approval'
+    ) -HeadSha $head -TrustedAuthors $trusted) $false 'one rejection blocks another approval'
 Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') `
-    -Comments @(Review-Comment -Reviewer gemini -Head $head) -HeadSha $head -Tier critical) $true `
+    -Comments @(Review-Comment -Reviewer gemini -Head $head) -HeadSha $head -TrustedAuthors $trusted -Tier critical) $true `
     'gemini may approve a critical change (owner decision, 2026-10-20)'
 # The exclusion list still works if a reviewer is ever put back on it.
 $savedExcluded = $script:CriticalTierExcluded
 $script:CriticalTierExcluded = @('gemini')
 Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') `
-    -Comments @(Review-Comment -Reviewer gemini -Head $head) -HeadSha $head -Tier critical) $false `
+    -Comments @(Review-Comment -Reviewer gemini -Head $head) -HeadSha $head -TrustedAuthors $trusted -Tier critical) $false `
     'an excluded reviewer cannot approve a critical change'
 Assert-Equal ((Get-EligibleReviewers -Authors @('claude') -Tier critical) -join ',') 'codex,grok' `
     'exclusion removes the reviewer from critical eligibility only'
@@ -84,12 +87,29 @@ Assert-Equal (@(Get-AuthorModelsFromMessages -CommitMessages `
     "change`n`nCo-Authored-By: Grok 4.7 <noreply@x.ai>")[0]) 'grok' 'grok author detection'
 Assert-Equal (Get-ReviewerModel -Reviewer grok -Tier critical) 'grok-4.7' 'grok pinned model'
 Assert-Equal (Test-CrossReviewSatisfied -Authors @('claude') `
-    -Comments @(Review-Comment -Reviewer grok -Head $head) -HeadSha $head -Tier critical) $true `
+    -Comments @(Review-Comment -Reviewer grok -Head $head) -HeadSha $head -TrustedAuthors $trusted -Tier critical) $true `
     'grok approval satisfies the gate'
 Assert-Equal (Test-CrossReviewSatisfied -Authors @('claude') -Comments @(
         Review-Comment -Reviewer grok -Head $head -CreatedAt ([datetime]::UtcNow.AddMinutes(-1))
         Review-Comment -Reviewer codex -Head $head -Verdict REQUEST_CHANGES -Blocking 1
-    ) -HeadSha $head) $false 'grok approval cannot override a rejection'
+    ) -HeadSha $head -TrustedAuthors $trusted) $false 'grok approval cannot override a rejection'
+
+# Anyone can comment on a public PR: only trusted logins' markers count.
+Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') `
+    -Comments @(Review-Comment -Reviewer gemini -Head $head -Author 'stranger') -HeadSha $head `
+    -TrustedAuthors $trusted) $false 'a forged approval from another login is ignored'
+Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') -Comments @(
+        Review-Comment -Reviewer gemini -Head $head -Verdict REQUEST_CHANGES -Blocking 1 `
+            -CreatedAt ([datetime]::UtcNow.AddMinutes(-1))
+        Review-Comment -Reviewer gemini -Head $head -Author 'stranger'
+    ) -HeadSha $head -TrustedAuthors $trusted) $false 'a newer forged approval cannot hide a real rejection'
+Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') `
+    -Comments @(Review-Comment -Reviewer gemini -Head $head) -HeadSha $head) $false `
+    'no trusted logins means no verdict counts'
+$noAuthor = Review-Comment -Reviewer gemini -Head $head
+$noAuthor.PSObject.Properties.Remove('author')
+Assert-Equal (Test-CrossReviewSatisfied -Authors @('codex') -Comments @($noAuthor) -HeadSha $head `
+    -TrustedAuthors $trusted) $false 'a comment with no author is ignored'
 
 $keyRoot = Join-Path ([IO.Path]::GetTempPath()) ("xai-key-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $keyRoot | Out-Null

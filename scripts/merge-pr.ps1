@@ -53,8 +53,13 @@ $changed = Get-ChangedFilesAndDeletions -Base $baseSha -Head $fetchedSha
 $tier = Get-BlastRadiusTier -ChangedFiles $changed.Files -Deletions $changed.Deletions
 Write-Host "Blast radius: $tier ($($changed.Files.Count) file(s) changed)"
 
+# Only the repository owner's comments count as verdicts: cross-review.ps1 posts
+# them through the owner's gh login, and anyone else can comment on a public PR.
+$owner = (gh repo view --json owner --jq '.owner.login')
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($owner)) { throw 'Could not resolve the repository owner' }
 $authorModels = @(Get-AuthorModelsFromPrCommits -Commits $pr.commits)
-if (-not (Test-CrossReviewSatisfied -Authors $authorModels -Comments $pr.comments -HeadSha $pr.headRefOid -Tier $tier)) {
+if (-not (Test-CrossReviewSatisfied -Authors $authorModels -Comments $pr.comments -HeadSha $pr.headRefOid -Tier $tier `
+        -TrustedAuthors @($owner.Trim()))) {
     throw "Cross-model review is not satisfied for head $($pr.headRefOid). Run scripts/cross-review.ps1 -Number $Number and address any blocking findings."
 }
 

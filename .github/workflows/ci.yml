@@ -123,8 +123,10 @@ jobs:
         if: steps.scope.outputs.docs_only != 'true'
         continue-on-error: true
         run: for project in */pyproject.toml; do (cd "$(dirname "$project")" && uv run pip-audit); done
-      - name: Secret advisory
-        continue-on-error: true
+      # Blocking: GitHub's own secret scanning and push protection only run while the
+      # repository is public, and it switches between public and private, so this is the
+      # one secret check that is always on. A false positive goes in .gitleaksignore.
+      - name: Secret scan
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
