@@ -171,3 +171,13 @@ def test_dark_mode_and_theme_toggle(browser, url):
     assert page.evaluate("getComputedStyle(document.body).backgroundColor") == "rgb(246, 245, 241)"
     assert errors == []
     page.close()
+
+
+def test_values_that_round_to_zero_have_no_sign(browser, url):
+    # The fixture's 2026-10-14 run has net -0.003 or so: it must read 0.00, never "−0.00".
+    page, errors = open_page(browser, url, viewport={"width": 1300, "height": 900})
+    act = page.locator(".activity")
+    act.get_by_role("button", name="Show all 30").click()
+    assert "−0.00" not in act.inner_text() and "−0.0%" not in page.locator("main").inner_text()
+    assert errors == []
+    page.close()

@@ -314,12 +314,17 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
     const d = dp == null ? 0 : dp;
     return x.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: d, minimumFractionDigits: d }).replace("-", "−");
   };
-  const pct = function (x, dp, signed) {
+  // Sign from the rounded value, so anything that rounds to zero shows as 0, never "−0.0".
+  function signed(abs, raw, plus) {
+    if (+abs === 0) return abs;
+    return raw < 0 ? "−" + abs : (plus && raw > 0 ? "+" + abs : abs);
+  }
+  const pct = function (x, dp, plus) {
     if (!isNum(x)) return "—";
-    const s = (Math.abs(x) * 100).toFixed(dp == null ? 1 : dp) + "%";
-    return x < 0 ? "−" + s : (signed && x > 0 ? "+" + s : s);
+    const abs = (Math.abs(x) * 100).toFixed(dp == null ? 1 : dp);
+    return signed(abs, x, plus) + "%";
   };
-  const num = function (x, dp) { return isNum(x) ? x.toFixed(dp == null ? 2 : dp).replace("-", "−") : "—"; };
+  const num = function (x, dp) { return isNum(x) ? signed(Math.abs(x).toFixed(dp == null ? 2 : dp), x, false) : "—"; };
   const dirClass = function (x) { return !isNum(x) || Math.abs(x) < 5e-5 ? "" : x > 0 ? "up" : "down"; };
   function hasOffset(ts) { return /(Z|[+-]\d\d:\d\d)$/.test(ts); }
   function fmtDate(d) {
