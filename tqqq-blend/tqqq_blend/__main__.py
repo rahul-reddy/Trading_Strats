@@ -5,6 +5,7 @@
   run           the near-close process: compute targets, plan orders, execute (dry-run by default)
   ibkr-check    read-only IBKR connection test: account, balances, positions, quotes (never places orders)
   schwab-login  one-time (and weekly) Schwab OAuth login that writes the token file
+  dashboard     static HTML dashboard of runs, decisions and performance from each profile's state
 
 Broker profiles: python -m tqqq_blend --config config.ibkr-paper.toml <command>
 """
@@ -37,6 +38,9 @@ def main():
     r.add_argument("--force", action="store_true", help="ignore the near-close window and stale-data check")
     sub.add_parser("ibkr-check")
     sub.add_parser("schwab-login")
+    d = sub.add_parser("dashboard")
+    d.add_argument("--profiles", nargs="+", default=["config.ibkr-paper.toml", "config.ibkr-live.toml"])
+    d.add_argument("--out", default="state/dashboard")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -132,6 +136,11 @@ def main():
 
         SchwabBroker(cfg).connect(interactive=True)
         print("Schwab token saved to", cfg.broker.schwab_token_path)
+
+    elif args.cmd == "dashboard":
+        from .dashboard import build
+
+        print("Wrote", build(args.profiles, args.out))
 
 
 if __name__ == "__main__":

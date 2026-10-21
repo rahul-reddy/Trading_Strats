@@ -1,0 +1,9 @@
+[Unit]
+Description=Publish the dashboard after the close and the state backup on weekdays
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 16:35:00 America/New_York
+Persistent=true
+
+[Install]
+WantedBy=timers.target

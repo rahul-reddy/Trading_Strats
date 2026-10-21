@@ -2,14 +2,15 @@
 # Sets up (or updates) the trading server. Runs as root on the EC2 instance; deploy/push.sh calls it
 # through SSM Run Command after unpacking the code into /opt/trading/app. Safe to re-run.
 #
-#   install.sh <bucket>
+#   install.sh <bucket> [dashboard-app-id]
 #
 # Reads the IBKR logins from SSM Parameter Store (/trading/ibkr/{paper,live}/{username,password}).
 # Each account is optional; its gateway and timer run only when its login exists. IBKR allows one
 # session per username, so paper and live need different usernames to run side by side.
 set -euo pipefail
 
-BUCKET=${1:?usage: install.sh <bucket>}
+BUCKET=${1:?usage: install.sh <bucket> [dashboard-app-id]}
+DASHBOARD_APP_ID=${2:-}                # the stack's Amplify app; empty until the stack has one
 SECRETS_PATH=/trading/ibkr
 COMPOSE_VERSION=v5.6.0
 ROOT=/opt/trading
@@ -55,13 +56,19 @@ FINVIZ_TOKEN=$(aws ssm get-parameter --with-decryption --name /trading/finviz/to
 install -m 600 /dev/null "$ROOT/secrets/ibkr.env"
 printf 'IBKR_PAPER_USERNAME=%s\nIBKR_LIVE_USERNAME=%s\nFINVIZ_TOKEN=%s\n' "$PAPER_USER" "$LIVE_USER" "$FINVIZ_TOKEN" > "$ROOT/secrets/ibkr.env"
 ln -sfn "$ROOT/secrets/ibkr.env" "$APP/deploy/.env"
-echo "BUCKET=$BUCKET" > /etc/trading.env
+printf 'BUCKET=%s\nDASHBOARD_APP_ID=%s\n' "$BUCKET" "$DASHBOARD_APP_ID" > /etc/trading.env
 
 # Strategy image, then for each account with a login: its gateway and its timer
 docker build -q -f "$APP/deploy/Dockerfile" -t tqqq-blend:latest "$APP"   # compose build needs buildx, which AL2023 lacks
 cp "$APP"/deploy/server/*.service "$APP"/deploy/server/*.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now trading-backup.timer
+if [ -n "$DASHBOARD_APP_ID" ]; then
+  systemctl enable --now trading-dashboard.timer
+else
+  systemctl disable --now trading-dashboard.timer 2>/dev/null || true
+  echo "No dashboard app in the stack: dashboard timer is off."
+fi
 for acct in paper live; do
   user=$([ $acct = paper ] && echo "$PAPER_USER" || echo "$LIVE_USER")
   if [ -n "$user" ]; then

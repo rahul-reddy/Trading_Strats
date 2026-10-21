@@ -51,6 +51,25 @@
       "Resource": [ "arn:aws:ssm:us-east-1:*:parameter/trading/*", "arn:aws:ssm:us-east-1::parameter/aws/service/*" ]
     },
     {
+      "Sid": "Dashboard",
+      "Effect": "Allow",
+      "Action": "amplify:*",
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:RequestedRegion": "us-east-1" } }
+    },
+    {
+      "Sid": "DashboardSecret",
+      "Effect": "Allow",
+      "Action": [ "secretsmanager:CreateSecret", "secretsmanager:DeleteSecret", "secretsmanager:DescribeSecret", "secretsmanager:GetSecretValue", "secretsmanager:UpdateSecret", "secretsmanager:PutSecretValue", "secretsmanager:TagResource", "secretsmanager:UntagResource" ],
+      "Resource": "arn:aws:secretsmanager:us-east-1:*:secret:tqqq-trading-*"
+    },
+    {
+      "Sid": "DashboardPassword",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetRandomPassword",
+      "Resource": "*"
+    },
+    {
       "Sid": "Operate",
       "Effect": "Allow",
       "Action": [

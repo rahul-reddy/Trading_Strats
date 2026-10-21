@@ -71,6 +71,14 @@ services:
     <<: *job
     entrypoint: [ "python", "-m", "tqqq_blend", "--config", "config.aws-live.toml" ]
 
+  # Reads the state files only (no broker, no network) and writes state/dashboard/index.html.
+  # deploy/server/publish-dashboard.sh runs it, then uploads the page.
+  dashboard:
+    <<: *job
+    entrypoint: [ "python", "-m", "tqqq_blend" ]
+    command: [ "dashboard", "--profiles", "config.aws-paper.toml", "config.aws-live.toml", "--out", "state/dashboard" ]
+    network_mode: none
+
 secrets:
   ibkr_paper_password: { file: /opt/trading/secrets/ibkr_paper_password }
   ibkr_live_password: { file: /opt/trading/secrets/ibkr_live_password }

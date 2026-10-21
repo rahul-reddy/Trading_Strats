@@ -17,6 +17,7 @@ stopped too) and ~$0.20 for the public IP. Running it all the time would cost ab
 15:30  first run: paper places orders, live logs the orders it would place (dry run)
 15:50  last run of the window (runs after the first successful one do nothing)
 16:30  state (ledgers, trade logs) is copied to S3
+16:35  the dashboard is rebuilt from that state and published (password-protected)
 16:45  server stops
 ```
 
@@ -39,12 +40,14 @@ stopped too) and ~$0.20 for the public IP. Running it all the time would cost ab
 
 ```
 deploy/
-  aws/stack.yml                 instance, IAM role, security group, S3 bucket (releases + state backups)
+  aws/stack.yml                 instance, IAM role, security group, S3 bucket (releases + state backups),
+                                Amplify app + generated login for the dashboard
   aws/deploy-user-policy.json   permissions for the trading-deploy IAM user that runs everything below
   Dockerfile, docker-compose.yml
   push.sh                       merged commit -> git archive -> S3 -> SSM Run Command -> server/install.sh
   server/install.sh             installs Docker, pulls secrets from SSM, starts gateways, enables timers
-  server/*.service, *.timer     paper runs (orders on), live runs (dry run), daily state backup
+  server/*.service, *.timer     paper runs (orders on), live runs (dry run), daily state backup, dashboard
+  server/publish-dashboard.sh   builds the dashboard page and uploads it to Amplify, only behind the password
 ```
 
 | Account | Gateway | Strategy config | Orders |
@@ -129,6 +132,51 @@ The 16:45 stop schedule turns the server off. To stop it sooner, run `aws ec2 st
   or session taken over.
 - **Pausing:** to skip a day, or a vacation, disable `tqqq-trading-start` in the EventBridge Scheduler console.
   Ignoring the pushes also works, but only live stops; paper keeps trading.
+
+## Dashboard
+
+A single page showing each account's latest decision, performance against QQQ and TQQQ buy-and-hold,
+drawdown against the halt line, net exposure, run health (missed runs, failures, kill switch, halt) and the
+trade log. At 16:35 ET on weekdays the server builds it from `/opt/trading/state` (the `dashboard` Compose
+service, which has no network) and uploads it to an Amplify app. It is static: Amplify only serves the
+last page uploaded, and nothing on it can place or change anything.
+
+**Getting the address and login:**
+
+```bash
+aws cloudformation describe-stacks --stack-name tqqq-trading   --query "Stacks[0].Outputs[?OutputKey=='DashboardUrl'].OutputValue" --output text
+aws secretsmanager get-secret-value --secret-id tqqq-trading-dashboard --query SecretString --output text
+```
+
+The username and the 40-character password are generated when the stack creates the dashboard. Save them
+in your password manager or browser; nobody else gets them.
+
+**Setting it up** (once, after this change is merged):
+
+1. Update the deploy user's permissions (Amplify and the dashboard secret), with your admin credentials:
+   `aws iam put-user-policy --user-name trading-deploy --policy-name trading-deploy --policy-document file://deploy/aws/deploy-user-policy.json`
+2. Update the stack: `aws cloudformation deploy --stack-name tqqq-trading --template-file deploy/aws/stack.yml --capabilities CAPABILITY_IAM`
+3. Run `deploy/push.sh`. It hands the app ID to the server, which turns on `trading-dashboard.timer`.
+   To publish right away instead of at 16:35, push with `KEEP_RUNNING=1` and run
+   `sudo systemctl start trading-dashboard` in a Session Manager shell (`journalctl -u trading-dashboard` shows the result).
+
+**What keeps it private:**
+- Basic auth is set on the app and on its branch, from the generated secret; the template never contains it.
+- `publish-dashboard.sh` checks that both are on before every upload, and refuses to publish if either is off.
+  After the upload it requests the page without the password and fails loudly unless it gets `401`.
+- The page has no account numbers (anything shaped like an IBKR account ID is replaced), no credentials, and
+  loads nothing from other sites. Headers forbid indexing, framing and caching.
+- The server's role can deploy to this one Amplify app and nothing else; there are still no inbound ports.
+
+**Cost:** Secrets Manager $0.40 a month for the secret; Amplify hosting is a few cents a month at this size
+(a ~70 KB page, uploaded once a day). **Blast radius:** if the password leaked, someone could read the
+dashboard (balances, positions, trades); they could not trade, reach the server or change anything. To change
+the password, write a new one to the secret (`aws secretsmanager put-secret-value`) and set the same login on
+the app and the branch (`aws amplify update-app` and `aws amplify update-branch` with `--enable-basic-auth
+--basic-auth-credentials <base64 of user:password>`). A later stack update re-applies whatever the secret holds.
+
+**Preview locally** from any state folder: `uv run python -m tqqq_blend dashboard --out state/dashboard`, then open
+`state/dashboard/index.html`.
 
 ## Turning on live orders
 
