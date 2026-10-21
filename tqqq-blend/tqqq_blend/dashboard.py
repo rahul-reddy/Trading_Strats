@@ -107,7 +107,8 @@ def _max_drawdown(values: list[float]) -> float:
     peak, worst = values[0], 0.0
     for v in values:
         peak = max(peak, v)
-        worst = min(worst, v / peak - 1)
+        if peak > 0:  # equity at or below zero has no meaningful drawdown ratio; don't divide by it
+            worst = min(worst, v / peak - 1)
     return worst
 
 

@@ -121,3 +121,15 @@ def test_kill_switch_and_halt_are_surfaced(tmp_path):
 )
 def test_due_through(now, expected):
     assert due_through(pd.Timestamp(now, tz="America/New_York")) == expected
+
+
+def test_zero_or_negative_equity_does_not_crash_the_build(tmp_path):
+    state = tmp_path / "s"
+    state.mkdir()
+    with open(state / "runs.jsonl", "w", encoding="utf-8") as f:
+        for d, eq in (("2026-10-14", 0.0), ("2026-10-15", -50.0), ("2026-10-16", 100.0)):
+            f.write(json.dumps({"ts": f"{d}T15:30:00", "status": "no change", "net": 0.0, "equity": eq}) + "\n")
+    html = build([str(write_profile(tmp_path / "p.toml", "config.ibkr-paper.toml", state))], tmp_path / "out", now=NOW)
+    m = page_data(html.read_text(encoding="utf-8"))["strategies"][0]["accounts"][0]["metrics"]
+    assert m["return"] is None  # no ratio from a zero starting equity
+    assert m["max_drawdown"] == 0.0
