@@ -1,21 +1,19 @@
 # Status
 
-## Current handoff (2026-10-20)
+## Current handoff (2026-10-21)
 
-**Revision:** branch `feat/workflow-harness` (adopting the review and merge workflow). The server
-runs the code of `f2da519` (deployed from the working tree, before push.sh required merged commits).
+**Revision:** the server runs `19de244` (main), deployed 2026-10-21 through deploy/push.sh, the first deploy
+that way. The dashboard is live behind basic auth (stack output `DashboardUrl`; login in Secrets Manager
+`tqqq-trading-dashboard`) and republishes at 16:35 ET on weekdays.
 
-**Verified on this branch (local, Windows):**
-- `pwsh -NoProfile -File scripts/cross-review-selftest.ps1`: passed
-- `uv run --no-project --with pyyaml python scripts/validate_skills.py`: passed
-- tqqq-blend: `uv sync --locked`, `ruff check`, `ruff format --check`, `mypy`: clean;
-  `pytest --cov`: 14 passed, 49% line coverage (incl. deploy bundle tests: push.sh ships the commit, never the working tree)
-- Strategy output unchanged by the lint/format pass: compute_signals on QQQ since 1999 hashes the
-  same before and after (6,945 rows)
-- `docker build -f deploy/Dockerfile .` from uv.lock: builds, `signal` runs
+**Verified on 19de244 (local, Windows, and CI on the PR heads):**
+- `pwsh -NoProfile -File scripts/cross-review-selftest.ps1` and `validate_skills.py`: passed
+- tqqq-blend: `ruff check`, `ruff format --check`, `mypy`: clean; `pytest`: 31 passed, including 4
+  Chromium dashboard tests and the push bundle tests (exact commit, LF even with autocrlf)
+- On AWS: push.sh deploy succeeded; first dashboard publish succeeded; 401 without the password
 
 **Running:** tqqq-blend on AWS, the IBKR paper profile (config.aws-paper.toml), $100k strategy capital, Finviz
-quotes. First paper run is 2026-10-20 15:30 ET.
+quotes. Paper has run 2026-10-20 and 2026-10-21 (3 trades). The live profile has no login on the server yet.
 
 **Remaining:**
 - Test coverage is thin where orders are made: runner.py 27%, brokers/ibkr.py and
@@ -23,10 +21,19 @@ quotes. First paper run is 2026-10-20 15:30 ET.
   drawdown halt, max_order_value) and for the IBKR account-type check.
 - Live: store the new IBKR live user's login once IBKR approves it, deploy, approve the push,
   run ibkr-check. Confirm whether the gateway resends a missed 2FA push.
+- Dashboard: the net-exposure bars at the first and last day overlap the plot edge (cosmetic).
 
-**Next action:** check the 15:30 paper run (`/opt/trading/state/ibkr-paper/runs.jsonl`, trades.csv).
+**Next action:** after the 2026-10-22 close, confirm the 16:35 timer republished the dashboard on its own
+(`journalctl -u trading-dashboard`).
 
 ## History
+
+- 2026-10-21: Deployed. The deploy user's permissions became a managed policy (inline policies are capped at
+  2,048 characters; #13). Stack update added the Amplify app, branch and secret (no replacements). The first
+  push.sh run failed: archiving the tqqq-blend subtree skipped the root .gitattributes, so autocrlf shipped
+  CRLF scripts (`set: pipefail: invalid option`). Rolled the server back over SSM, fixed and tested (#14),
+  redeployed 19de244. First publish succeeded; verified 401 without and wrong password, 200 with it,
+  no-store/noindex/DENY headers, no account-ID-shaped strings on the page. Server stopped afterwards.
 
 - 2026-10-21: Dashboard (branch `feat/dashboard`): `python -m tqqq_blend dashboard` builds one static page
   from the state files (decision, performance vs QQQ/TQQQ buy-and-hold, drawdown vs halt, exposure, run
