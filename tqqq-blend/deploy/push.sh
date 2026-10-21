@@ -48,6 +48,8 @@ read -r -p "Type 'deploy $SHORT' to continue: " answer
 out() { aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
 INSTANCE=$(out InstanceId)
 BUCKET=$(out BucketName)
+DASHBOARD_APP=$(out DashboardAppId)   # empty (or "None") until the stack has the dashboard
+[ "$DASHBOARD_APP" != None ] || DASHBOARD_APP=
 KEY=releases/tqqq-blend-$(date -u +%Y%m%dT%H%M%SZ)-$SHORT.tgz
 
 STATE=$(aws ec2 describe-instances --instance-ids "$INSTANCE" --query "Reservations[0].Instances[0].State.Name" --output text)
@@ -71,7 +73,7 @@ CMD_ID=$(aws ssm send-command --instance-ids "$INSTANCE" --document-name AWS-Run
     \"aws s3 cp --only-show-errors s3://$BUCKET/$KEY /tmp/release.tgz\",
     \"rm -rf /opt/trading/app.new && mkdir -p /opt/trading/app.new && tar xzf /tmp/release.tgz -C /opt/trading/app.new\",
     \"rm -rf /opt/trading/app.old && { [ ! -d /opt/trading/app ] || mv /opt/trading/app /opt/trading/app.old; } && mv /opt/trading/app.new /opt/trading/app && echo $SHA > /opt/trading/app/REVISION\",
-    \"bash /opt/trading/app/deploy/server/install.sh $BUCKET\"
+    \"bash /opt/trading/app/deploy/server/install.sh $BUCKET $DASHBOARD_APP\"
   ]")
 
 while :; do

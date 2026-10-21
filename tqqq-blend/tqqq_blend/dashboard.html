@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Trading Dashboard</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f3f2ee;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --long: #2a78d6;
+  --short: #e34948;
+  --up: #006300;
+  --down: #b42323;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 4px 16px rgba(11, 11, 11, 0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --long: #3987e5;
+    --short: #e66767;
+    --up: #0ca30c;
+    --down: #e66767;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --long: #3987e5;
+  --short: #e66767;
+  --up: #0ca30c;
+  --down: #e66767;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 1240px; margin: 0 auto; padding: 28px 16px 64px; }
+header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+h1 { font-size: 26px; line-height: 1.2; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+.sub { color: var(--ink-2); margin: 4px 0 0; font-size: 14px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+h3 { font-size: 14px; margin: 0 0 10px; font-weight: 600; color: var(--ink); }
+.theme-btn {
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
+  border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.theme-btn:hover { color: var(--ink); }
+.overall { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.strategy { margin-bottom: 40px; }
+.accounts { display: grid; align-items: start; grid-template-columns: repeat(auto-fit, minmax(min(100%, 540px), 1fr)); gap: 20px; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: var(--shadow); padding: 20px; min-width: 0;
+}
+.card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.card-head .name { font-size: 18px; font-weight: 650; margin-right: auto; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap;
+}
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.pill svg { flex: none; }
+.hero { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 4px; }
+.hero .value { font-size: 44px; line-height: 1.1; font-weight: 650; letter-spacing: -0.02em; }
+.delta { font-weight: 600; font-size: 15px; }
+.delta.up { color: var(--up); }
+.delta.down { color: var(--down); }
+.hero-note { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.tile { background: var(--surface-2); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.tile .label { color: var(--ink-2); font-size: 12.5px; }
+.tile .v { font-size: 20px; font-weight: 650; margin-top: 2px; }
+.tile .note { color: var(--muted); font-size: 12px; }
+.section { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+.decision-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.alloc { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--surface-2); gap: 2px; margin: 8px 0 8px; }
+.alloc span { display: block; height: 100%; }
+.alloc-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--ink-2); }
+.key { display: inline-flex; align-items: center; gap: 6px; }
+.key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.key i.line { width: 14px; height: 2px; border-radius: 1px; }
+dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 13.5px; }
+dl.kv dt { color: var(--ink-2); }
+dl.kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.orders { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13.5px; }
+.orders li { padding: 2px 0; }
+.chart { position: relative; margin-top: 4px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .axis text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .grid line { stroke: var(--grid); stroke-width: 1; }
+.chart .baseline { stroke: var(--axis); stroke-width: 1; }
+.chart .end-label { fill: var(--ink-2); font-size: 11.5px; font-weight: 600; }
+.chart .ref-label { fill: var(--ink-2); font-size: 11px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 6px; }
+.chart-empty { color: var(--muted); font-size: 13px; padding: 18px 0; }
+.tip {
+  position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  min-width: 150px; z-index: 5; display: none;
+}
+.tip .d { color: var(--muted); margin-bottom: 4px; }
+.tip .row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.tip .row b { font-variant-numeric: tabular-nums; }
+.tip .row span { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.tip .row i { display: inline-block; width: 12px; height: 2px; border-radius: 1px; }
+.charts { display: grid; gap: 22px; }
+details { margin-top: 12px; }
+summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 6px 0; color: var(--ink); }
+summary::marker { color: var(--muted); }
+.table-wrap { overflow-x: auto; margin-top: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.when { white-space: nowrap; color: var(--ink-2); }
+.empty { color: var(--ink-2); background: var(--surface-2); border-radius: 12px; padding: 16px; font-size: 14px; }
+.alerts { display: grid; gap: 8px; margin-bottom: 16px; }
+.alert { display: flex; gap: 10px; align-items: flex-start; border-radius: 10px; padding: 10px 12px; background: var(--surface-2); font-size: 13.5px; }
+.alert svg { flex: none; margin-top: 2px; }
+footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
+@media (max-width: 520px) {
+  .hero .value { font-size: 36px; }
+  .card { padding: 16px; border-radius: 14px; }
+  header.top { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Trading dashboard</h1>
+      <p class="sub" id="generated"></p>
+      <div class="overall" id="overall"></div>
+    </div>
+    <button class="theme-btn" id="theme" type="button">Theme: auto</button>
+  </header>
+  <main id="app"></main>
+  <footer>
+    Equity and prices are as of each run's decision time (about 15:30 ET), not the official close.
+    Benchmarks are buy-and-hold over the same run days, from the prices each run recorded.
+  </footer>
+</div>
+<script id="dashboard-data" type="application/json">__DASHBOARD_DATA__</script>
+<script>
+"use strict";
+(function () {
+  const DATA = JSON.parse(document.getElementById("dashboard-data").textContent);
+  const SVGNS = "http://www.w3.org/2000/svg";
+
+  // ---- theme toggle (auto -> light -> dark), remembered per browser when storage works ----
+  const themeBtn = document.getElementById("theme");
+  const THEMES = ["auto", "light", "dark"];
+  function applyTheme(t) {
+    if (t === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", t);
+    themeBtn.textContent = "Theme: " + t;
+  }
+  let theme = "auto";
+  try { theme = localStorage.getItem("dash-theme") || "auto"; } catch (e) { /* storage blocked */ }
+  if (!THEMES.includes(theme)) theme = "auto";
+  applyTheme(theme);
+  themeBtn.addEventListener("click", function () {
+    theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+    try { localStorage.setItem("dash-theme", theme); } catch (e) { /* storage blocked */ }
+    applyTheme(theme);
+  });
+
+  // ---- helpers: every recorded string goes in through textContent, never innerHTML ----
+  function el(tag, attrs, children) {
+    const n = document.createElement(tag);
+    if (attrs) for (const k in attrs) {
+      if (k === "class") n.className = attrs[k];
+      else if (k === "text") n.textContent = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    }
+    (children || []).forEach(function (c) { if (c != null) n.append(c); });
+    return n;
+  }
+  function svg(tag, attrs) {
+    const n = document.createElementNS(SVGNS, tag);
+    for (const k in attrs || {}) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  const isNum = function (x) { return typeof x === "number" && isFinite(x); };
+  const money = function (x, dp) {
+    if (!isNum(x)) return "—";
+    return x.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: dp == null ? 0 : dp, minimumFractionDigits: dp == null ? 0 : dp });
+  };
+  const pct = function (x, dp, signed) {
+    if (!isNum(x)) return "—";
+    const s = (x * 100).toFixed(dp == null ? 1 : dp) + "%";
+    return signed && x > 0 ? "+" + s : s.replace("-", "−");
+  };
+  const num = function (x, dp) { return isNum(x) ? x.toFixed(dp == null ? 2 : dp).replace("-", "−") : "—"; };
+  function fmtDate(d) {
+    if (!d) return "—";
+    const dt = new Date(d.length === 10 ? d + "T12:00:00" : d);
+    return isNaN(dt) ? d : dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+  function fmtTime(ts) {
+    if (!ts) return "—";
+    const dt = new Date(ts);
+    if (isNaN(dt)) return ts;
+    // Run timestamps are ET wall time with no offset; a timestamp with an offset is shown in ET too.
+    const tz = /(Z|[+-]\d\d:\d\d)$/.test(ts) ? { timeZone: "America/New_York" } : {};
+    return dt.toLocaleDateString("en-US", Object.assign({ month: "short", day: "numeric" }, tz)) + " " +
+      dt.toLocaleTimeString("en-US", Object.assign({ hour: "numeric", minute: "2-digit" }, tz));
+  }
+
+  // ---- status: icon + label, never color alone ----
+  const ICONS = {
+    good: "M4 8.5l2.5 2.5L12 5.5",
+    warning: "M8 4.5v4M8 11.2v.3",
+    critical: "M5.5 5.5l5 5M10.5 5.5l-5 5",
+    info: "M8 7.5v4M8 4.8v.3",
+  };
+  function statusIcon(level) {
+    const s = svg("svg", { width: 16, height: 16, viewBox: "0 0 16 16", "aria-hidden": "true" });
+    const color = level === "good" ? "var(--good)" : level === "warning" ? "var(--warning)" : level === "critical" ? "var(--critical)" : "var(--muted)";
+    s.append(svg("circle", { cx: 8, cy: 8, r: 7.5, fill: color }));
+    s.append(svg("path", { d: ICONS[level] || ICONS.info, stroke: level === "warning" ? "#0b0b0b" : "#fff", "stroke-width": 1.8, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }));
+    return s;
+  }
+  function pill(level, text) { return el("span", { class: "pill" }, [statusIcon(level), el("span", { text: text })]); }
+
+  function assess(a) {
+    const alerts = [];
+    if (a.kill_switch) alerts.push(["critical", "Kill switch is on (state/STOP exists): runs stop before trading."]);
+    if (a.halted) alerts.push(["critical", "Halted: " + a.halted + ". Clear 'halted' in state.json to resume."]);
+    const last = a.last_run;
+    if (last && String(last.status || "").startsWith("error")) alerts.push(["critical", "Last run failed: " + last.status]);
+    if (last && a.due_through && a.due_through !== "None" && String(last.ts).slice(0, 10) < a.due_through)
+      alerts.push(["warning", "No run recorded for " + fmtDate(a.due_through) + " (last run " + fmtTime(last.ts) + ")."]);
+    // the latest due day already has its own alert above
+    const missed = (a.missed_days || []).filter(function (d) { return d !== a.due_through; });
+    if (missed.length) alerts.push(["warning", missed.length + " earlier trading day(s) with no run, most recently " + fmtDate(missed[missed.length - 1]) + "."]);
+    if (a.unreadable_run_lines) alerts.push(["warning", a.unreadable_run_lines + " line(s) in runs.jsonl could not be read and are left out."]);
+    if (a.errors_30d && !(last && String(last.status || "").startsWith("error"))) alerts.push(["info", a.errors_30d + " failed run(s) in the last 30 days."]);
+    let level = "good", label = "Healthy";
+    if (!a.runs_total) { level = "info"; label = "No runs yet"; }
+    if (alerts.some(function (x) { return x[0] === "warning"; })) { level = "warning"; label = "Needs a look"; }
+    if (alerts.some(function (x) { return x[0] === "critical"; })) { level = "critical"; label = a.halted || a.kill_switch ? "Halted" : "Failing"; }
+    return { level: level, label: label, alerts: alerts };
+  }
+
+  const MODE = {
+    "paper": "Paper account",
+    "live": "Live · orders on",
+    "live-disabled": "Live · orders off (dry run)",
+  };
+
+  // ---- charts: inline SVG, one y-axis, crosshair + one tooltip listing every series ----
+  function niceTicks(lo, hi, count) {
+    if (lo === hi) { lo -= 1; hi += 1; }
+    const raw = (hi - lo) / count;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map(function (m) { return m * mag; }).find(function (s) { return s >= raw; });
+    const start = Math.floor(lo / step) * step, ticks = [];
+    for (let v = start; v <= hi + step * 0.5; v += step) ticks.push(+v.toFixed(10));
+    return ticks;
+  }
+
+  // Charts draw at their real width (so text stays 11px on a phone) and redraw when it changes.
+  const CHARTS = [];
+  function chart(opts) {
+    const wrap = el("div", { class: "chart" });
+    wrap._opts = opts;
+    CHARTS.push(wrap);
+    return wrap;
+  }
+
+  function draw(wrap) {
+    // opts: dates[], series[{name, color, values[], area?}], yFmt, tipFmt, refLine?{y,label}, bars?
+    const opts = wrap._opts;
+    wrap.replaceChildren();
+    opts.series.forEach(function (ser) { ser._last = null; });
+    const n = opts.dates.length;
+    const W = Math.max(280, Math.round(wrap.clientWidth || 640));
+    wrap._w = W;
+    const H = opts.height || 220, M = { t: 10, r: opts.endLabels ? 92 : 16, b: 26, l: 52 };
+    const iw = W - M.l - M.r, ih = H - M.t - M.b;
+    const all = [];
+    opts.series.forEach(function (s) { s.values.forEach(function (v) { if (isNum(v)) all.push(v); }); });
+    if (opts.refLine) all.push(opts.refLine.y);
+    if (opts.zero) all.push(0);
+    if (n < 2 || all.length < 2) {
+      wrap.append(el("div", { class: "chart-empty", text: "The chart appears after two days of runs." }));
+      return wrap;
+    }
+    let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    const pad = (hi - lo || Math.abs(hi) || 1) * 0.08;
+    if (!opts.zero || lo < 0) lo -= pad;
+    if (!opts.zero || hi > 0) hi += pad;
+    if (opts.clampMax != null) hi = Math.min(hi, opts.clampMax);
+    // the axis runs from one round tick to the next, so the top and bottom of the plot are labelled
+    let ticks = niceTicks(lo, hi, 4);
+    if (opts.clampMax != null) ticks = ticks.filter(function (t) { return t <= opts.clampMax + 1e-9; });
+    lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]);
+    const x = function (i) { return M.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw); };
+    const y = function (v) { return M.t + ih - ((v - lo) / (hi - lo)) * ih; };
+
+    const s = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opts.label });
+    const grid = svg("g", { class: "grid" }), axis = svg("g", { class: "axis" });
+    ticks.forEach(function (t) {
+      grid.append(svg("line", { x1: M.l, x2: W - M.r, y1: y(t), y2: y(t) }));
+      const tx = svg("text", { x: M.l - 8, y: y(t) + 4, "text-anchor": "end" });
+      tx.textContent = opts.yFmt(t);
+      axis.append(tx);
+    });
+    const xt = Math.min(W < 420 ? 3 : 5, n);
+    for (let k = 0; k < xt; k++) {
+      const i = Math.round((k / (xt - 1 || 1)) * (n - 1));
+      const tx = svg("text", { x: x(i), y: H - 6, "text-anchor": k === 0 ? "start" : k === xt - 1 ? "end" : "middle" });
+      tx.textContent = new Date(opts.dates[i] + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      axis.append(tx);
+    }
+    s.append(grid, axis);
+    const base = opts.zero ? 0 : (opts.baseline != null ? opts.baseline : null);
+    if (base != null && base >= lo && base <= hi) s.append(svg("line", { class: "baseline", x1: M.l, x2: W - M.r, y1: y(base), y2: y(base) }));
+
+    if (opts.bars) {
+      const bw = Math.max(1, Math.min(24, iw / n - 2));
+      opts.series[0].values.forEach(function (v, i) {
+        if (!isNum(v) || v === 0) return;
+        const y0 = y(0), y1 = y(v), h = Math.abs(y1 - y0), r = Math.min(4, h, bw / 2);
+        const left = x(i) - bw / 2, top = Math.min(y0, y1);
+        // rounded data end, square at the baseline
+        const d = v > 0
+          ? "M" + left + "," + y0 + "V" + (top + r) + "Q" + left + "," + top + " " + (left + r) + "," + top + "H" + (left + bw - r) + "Q" + (left + bw) + "," + top + " " + (left + bw) + "," + (top + r) + "V" + y0 + "Z"
+          : "M" + left + "," + y0 + "V" + (top + h - r) + "Q" + left + "," + (top + h) + " " + (left + r) + "," + (top + h) + "H" + (left + bw - r) + "Q" + (left + bw) + "," + (top + h) + " " + (left + bw) + "," + (top + h - r) + "V" + y0 + "Z";
+        s.append(svg("path", { d: d, fill: v > 0 ? opts.posColor : opts.negColor }));
+      });
+    }
+
+    if (opts.refLine && opts.refLine.y >= lo && opts.refLine.y <= hi) {
+      s.append(svg("line", { x1: M.l, x2: W - M.r, y1: y(opts.refLine.y), y2: y(opts.refLine.y), stroke: "var(--critical)", "stroke-width": 1.5 }));
+      const t = svg("text", { class: "ref-label", x: W - M.r, y: y(opts.refLine.y) - 5, "text-anchor": "end" });
+      t.textContent = opts.refLine.label;
+      s.append(t);
+    }
+
+    if (!opts.bars) opts.series.forEach(function (ser) {
+      let d = "", started = false, firstI = null, lastI = null;
+      ser.values.forEach(function (v, i) {
+        if (!isNum(v)) { started = false; return; }
+        d += (started ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1);
+        started = true; if (firstI == null) firstI = i; lastI = i;
+      });
+      if (!d) return;
+      if (ser.area) {
+        const yb = y(base != null ? base : lo);
+        s.append(svg("path", { d: d + "L" + x(lastI) + "," + yb + "L" + x(firstI) + "," + yb + "Z", fill: ser.color, "fill-opacity": 0.1 }));
+      }
+      s.append(svg("path", { d: d, fill: "none", stroke: ser.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      s.append(svg("circle", { cx: x(lastI), cy: y(ser.values[lastI]), r: 4, fill: ser.color, stroke: "var(--surface)", "stroke-width": 2 }));
+      ser._last = lastI;
+    });
+
+    // direct end labels, only when they don't collide (otherwise legend + tooltip carry identity)
+    if (opts.endLabels && !opts.bars) {
+      const labels = opts.series.filter(function (r) { return r._last != null; })
+        .map(function (r) { return { r: r, y: y(r.values[r._last]) }; })
+        .sort(function (a, b) { return a.y - b.y; });
+      const clear = labels.every(function (l, i) { return i === 0 || l.y - labels[i - 1].y >= 14; });
+      if (clear) labels.forEach(function (l) {
+        const t = svg("text", { class: "end-label", x: x(l.r._last) + 9, y: l.y + 4 });
+        t.textContent = opts.yFmt(l.r.values[l.r._last]) + " " + l.r.short;
+        s.append(t);
+      });
+    }
+
+    // crosshair layer: the whole plot is the hit target
+    const cross = svg("line", { y1: M.t, y2: M.t + ih, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden" });
+    const dots = opts.bars ? [] : opts.series.map(function (ser) {
+      const c = svg("circle", { r: 4, fill: ser.color, stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" });
+      s.append(c); return c;
+    });
+    s.append(cross);
+    const hit = svg("rect", { x: M.l, y: 0, width: iw, height: H, fill: "transparent", tabindex: 0 });
+    s.append(hit);
+    const tip = el("div", { class: "tip", role: "status" });
+    wrap.append(s, tip);
+    function show(i) {
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+      tip.replaceChildren(el("div", { class: "d", text: fmtDate(opts.dates[i]) }));
+      opts.series.forEach(function (ser, k) {
+        const v = ser.values[i];
+        if (dots[k]) {
+          if (isNum(v)) { dots[k].setAttribute("cx", x(i)); dots[k].setAttribute("cy", y(v)); dots[k].setAttribute("visibility", "visible"); }
+          else dots[k].setAttribute("visibility", "hidden");
+        }
+        const key = el("i"); key.style.background = ser.color;
+        tip.append(el("div", { class: "row" }, [el("span", null, [key, document.createTextNode(ser.name)]), el("b", { text: (opts.tipFmt || opts.yFmt)(v) })]));
+      });
+      (opts.extraTip ? opts.extraTip(i) : []).forEach(function (r) {
+        tip.append(el("div", { class: "row" }, [el("span", { text: r[0] }), el("b", { text: r[1] })]));
+      });
+      tip.style.display = "block";
+      const rect = s.getBoundingClientRect(), scale = rect.width / W;
+      const px = x(i) * scale, tw = tip.offsetWidth;
+      tip.style.left = Math.max(0, Math.min(rect.width - tw, px + 12 > rect.width - tw ? px - tw - 12 : px + 12)) + "px";
+      tip.style.top = (M.t * scale) + "px";
+    }
+    function hide() {
+      cross.setAttribute("visibility", "hidden"); tip.style.display = "none";
+      dots.forEach(function (d) { d.setAttribute("visibility", "hidden"); });
+    }
+    let cur = n - 1;
+    hit.addEventListener("pointermove", function (ev) {
+      const rect = s.getBoundingClientRect();
+      const px = (ev.clientX - rect.left) * (W / rect.width);
+      cur = Math.max(0, Math.min(n - 1, Math.round(((px - M.l) / iw) * (n - 1))));
+      show(cur);
+    });
+    hit.addEventListener("pointerleave", hide);
+    hit.addEventListener("focus", function () { show(cur); });
+    hit.addEventListener("blur", hide);
+    hit.addEventListener("keydown", function (ev) {
+      if (ev.key === "ArrowLeft") { cur = Math.max(0, cur - 1); show(cur); ev.preventDefault(); }
+      if (ev.key === "ArrowRight") { cur = Math.min(n - 1, cur + 1); show(cur); ev.preventDefault(); }
+    });
+    return wrap;
+  }
+
+  function legend(items) {
+    return el("div", { class: "chart-legend" }, items.map(function (it) {
+      const k = el("i", { class: it.line ? "line" : "" }); k.style.background = it.color;
+      return el("span", { class: "key" }, [k, document.createTextNode(it.name)]);
+    }));
+  }
+
+  // ---- account card ----
+  function tile(label, value, note, cls) {
+    return el("div", { class: "tile" }, [
+      el("div", { class: "label", text: label }),
+      el("div", { class: "v" + (cls ? " " + cls : ""), text: value }),
+      note ? el("div", { class: "note", text: note }) : null,
+    ]);
+  }
+
+  function relClass(x) { return !isNum(x) || x === 0 ? "" : x > 0 ? "delta up" : "delta down"; }
+
+  function decisionSection(a) {
+    const d = a.decision, sym = a.symbols;
+    const sec = el("div", { class: "section" }, [el("h3", { text: "Latest decision" })]);
+    if (!d) { sec.append(el("div", { class: "empty", text: "No run has computed a signal yet." })); return sec; }
+    const wl = isNum(d.w_long) ? d.w_long : 0, ws = isNum(d.w_short) ? d.w_short : 0, cash = Math.max(0, 1 - wl - ws);
+    const bar = el("div", { class: "alloc", role: "img", "aria-label": "Target: " + pct(wl, 0) + " " + sym.long + ", " + pct(ws, 0) + " " + sym.short + ", " + pct(cash, 0) + " cash" });
+    [[wl, "var(--long)"], [ws, "var(--short)"], [cash, "var(--muted)"]].forEach(function (p) {
+      if (p[0] > 0) { const s = el("span"); s.style.width = (p[0] * 100) + "%"; s.style.background = p[1]; bar.append(s); }
+    });
+    const lk = function (c, t) { const i = el("i"); i.style.background = c; return el("span", { class: "key" }, [i, document.createTextNode(t)]); };
+    const orders = (d.orders || []);
+    const left = el("div", null, [
+      el("div", { class: "sub", text: fmtTime(d.ts) + " · " + (d.status || "—") }),
+      bar,
+      el("div", { class: "alloc-legend" }, [lk("var(--long)", sym.long + " " + pct(wl, 0)), lk("var(--short)", sym.short + " " + pct(ws, 0)), lk("var(--muted)", "Cash " + pct(cash, 0))]),
+      el("ul", { class: "orders" }, orders.length
+        ? orders.map(function (o) { return el("li", { text: o.side + " " + o.quantity + " " + o.symbol + " (" + o.order_type + ")" }); })
+        : [el("li", { class: "sub", text: d.status && String(d.status).startsWith("error") ? "No orders: the run stopped." : "No orders: inside the rebalance band." })]),
+    ]);
+    const kv = el("dl", { class: "kv" });
+    [
+      ["Net exposure", num(d.net, 2)],
+      ["Trend sleeve", num(d.trend, 2)],
+      ["Mean-reversion sleeve", num(d.mr, 2)],
+      ["Market-timing sleeve", num(d.vibha, 2)],
+      ["Volatility scale", num(d.vol_scale, 2)],
+      ["Distribution days", d.dist_days == null ? "—" : String(d.dist_days)],
+      ["Sell flags", d.sell_flags == null ? "—" : String(d.sell_flags)],
+      ["Timing event", d.vibha_event ? String(d.vibha_event) : "none"],
+      [sym.signal + " price", money(d.qqq, 2)],
+      ["Quotes from", d.quote_source === "finviz" ? "Finviz (real time)" : d.quote_source ? String(d.quote_source).toUpperCase() + " (may be delayed)" : "—"],
+    ].forEach(function (r) { kv.append(el("dt", { text: r[0] }), el("dd", { text: r[1] })); });
+    sec.append(el("div", { class: "decision-grid" }, [left, kv]));
+    return sec;
+  }
+
+  function chartsSection(a) {
+    const ser = a.series || [], sym = a.symbols, dates = ser.map(function (p) { return p.date; });
+    const sec = el("div", { class: "section charts" });
+    const idx = function (key) {
+      const first = ser.find(function (p) { return isNum(p[key]) && p[key] > 0; });
+      return ser.map(function (p) { return first && isNum(p[key]) ? (p[key] / first[key]) * 100 : null; });
+    };
+    const growth = [
+      { name: "Strategy", short: "Strategy", color: "var(--series-1)", values: idx("equity") },
+      { name: sym.signal + " buy and hold", short: sym.signal, color: "var(--series-2)", values: idx("qqq") },
+      { name: sym.long + " buy and hold", short: sym.long, color: "var(--series-3)", values: idx("long_px") },
+    ];
+    sec.append(el("div", null, [
+      el("h3", { text: "Growth of $100" }),
+      legend(growth.map(function (g) { return { name: g.name, color: g.color, line: true }; })),
+      chart({ label: "Growth of $100: strategy against buy and hold", dates: dates, series: growth, baseline: 100, endLabels: true,
+        yFmt: function (v) { return isNum(v) ? "$" + v.toFixed(0) : "—"; },
+        tipFmt: function (v) { return isNum(v) ? "$" + v.toFixed(2) : "—"; } }),
+    ]));
+    let peak = -Infinity;
+    const dd = ser.map(function (p) { if (!isNum(p.equity)) return null; peak = Math.max(peak, p.equity); return p.equity / peak - 1; });
+    sec.append(el("div", null, [
+      el("h3", { text: "Drawdown from peak" }),
+      chart({ label: "Strategy drawdown from its peak", dates: dates, height: 170, zero: true, clampMax: 0,
+        series: [{ name: "Drawdown", color: "var(--series-1)", values: dd, area: true }],
+        refLine: { y: -a.halt_drawdown, label: "Halt at " + pct(-a.halt_drawdown, 0) },
+        yFmt: function (v) { return pct(v, 0); }, tipFmt: function (v) { return pct(v, 1); } }),
+    ]));
+    sec.append(el("div", null, [
+      el("h3", { text: "Net exposure" }),
+      legend([{ name: sym.long + " (long)", color: "var(--long)" }, { name: sym.short + " (short)", color: "var(--short)" }]),
+      chart({ label: "Net exposure by day", dates: dates, height: 150, zero: true, bars: true, posColor: "var(--long)", negColor: "var(--short)",
+        series: [{ name: "Net", color: "var(--axis)", values: ser.map(function (p) { return p.net; }) }],
+        yFmt: function (v) { return num(v, 1); }, tipFmt: function (v) { return num(v, 2); },
+        extraTip: function (i) { return [[sym.long, pct(ser[i].w_long, 0)], [sym.short, pct(ser[i].w_short, 0)]]; } }),
+    ]));
+    return sec;
+  }
+
+  function table(headers, rows) {
+    const t = el("table");
+    t.append(el("thead", null, [el("tr", null, headers.map(function (h) { return el("th", { class: h[1] || "", text: h[0] }); }))]));
+    t.append(el("tbody", null, rows.map(function (r) {
+      return el("tr", null, r.map(function (c, i) { return el("td", { class: headers[i][1] || "", text: c }); }));
+    })));
+    return el("div", { class: "table-wrap" }, [t]);
+  }
+
+  function logsSection(a) {
+    const sec = el("div", { class: "section" });
+    const runs = a.runs || [], trades = a.trades || [];
+    sec.append(el("details", null, [
+      el("summary", { text: "Recent runs (" + runs.length + " of " + a.runs_total + ")" }),
+      runs.length ? table([["When", "when"], ["Status"], ["Net", "num"], ["Equity", "num"], ["Orders", "num"], ["Quotes"]],
+        runs.map(function (r) { return [fmtTime(r.ts), String(r.status || "—"), num(r.net, 2), money(r.equity), r.orders ? String(r.orders.length) : "—", r.quote_source ? String(r.quote_source) : "—"]; }))
+        : el("div", { class: "empty", text: "No runs recorded." }),
+    ]));
+    sec.append(el("details", null, [
+      el("summary", { text: "Trades (" + trades.length + " of " + (a.trades_total || 0) + ")" }),
+      trades.length ? table([["When", "when"], ["Side"], ["Qty", "num"], ["Symbol"], ["Type"], ["Ref price", "num"], ["Result"]],
+        trades.map(function (t) { return [fmtTime(t.ts), t.side, t.qty, t.symbol, t.type, money(parseFloat(t.ref_price), 2), t.result]; }))
+        : el("div", { class: "empty", text: "No trades yet." }),
+    ]));
+    if ((a.missed_days || []).length) sec.append(el("details", null, [
+      el("summary", { text: "Trading days with no run (" + a.missed_days.length + ")" }),
+      el("div", { class: "sub", text: a.missed_days.map(fmtDate).join(" · ") }),
+    ]));
+    return sec;
+  }
+
+  function accountCard(a) {
+    const st = assess(a);
+    const card = el("section", { class: "card account", "data-mode": a.mode, "aria-label": a.name + " account" });
+    card.append(el("div", { class: "card-head" }, [
+      el("span", { class: "name", text: a.name }),
+      el("span", { class: "badge", text: MODE[a.mode] || a.mode }),
+      pill(st.level, st.label),
+    ]));
+    if (st.alerts.length) card.append(el("div", { class: "alerts" }, st.alerts.map(function (al) {
+      return el("div", { class: "alert" }, [statusIcon(al[0]), el("span", { text: al[1] })]);
+    })));
+    const m = a.metrics;
+    if (!a.runs_total) {
+      card.append(el("div", { class: "empty", text: a.mode === "live-disabled"
+        ? "No runs recorded yet. Orders are off for this account until live_trading_enabled is set and the run passes --live."
+        : "No runs recorded yet." }));
+      return card;
+    }
+    if (m) {
+      card.append(el("div", { class: "hero" }, [
+        el("span", { class: "value", text: money(m.equity) }),
+        el("span", { class: relClass(m.return), text: pct(m.return, 2, true) + " since " + fmtDate(m.start_date) }),
+      ]));
+      card.append(el("div", { class: "hero-note", text: "Strategy equity, started at " + money(m.start_equity) + " · allotted capital " + money(a.capital) }));
+      const vs = function (b) {
+        if (!isNum(m.return) || !isNum(b)) return null;
+        const d = (m.return - b) * 100;
+        return "Strategy " + (d >= 0 ? "ahead by " : "behind by ") + Math.abs(d).toFixed(1) + " pts";
+      };
+      card.append(el("div", { class: "tiles" }, [
+        tile("Return since start", pct(m.return, 2, true), m.days + " trading days", relClass(m.return)),
+        tile(a.symbols.signal + " buy and hold", pct(m.qqq_return, 2, true), vs(m.qqq_return)),
+        tile(a.symbols.long + " buy and hold", pct(m.long_return, 2, true), vs(m.long_return)),
+        tile("Drawdown now", pct(m.drawdown, 1), "Worst " + pct(m.max_drawdown, 1) + " · halt " + pct(-a.halt_drawdown, 0)),
+        tile("Trades", String(a.trades_total || 0), a.runs_total + " runs recorded"),
+      ]));
+    } else {
+      card.append(el("div", { class: "empty", text: "No run has valued the account yet, so there is no performance to show." }));
+    }
+    card.append(decisionSection(a));
+    if (m) card.append(chartsSection(a));
+    card.append(logsSection(a));
+    return card;
+  }
+
+  // ---- page ----
+  document.getElementById("generated").textContent = "Updated " + fmtTime(DATA.generated) + " ET";
+  const app = document.getElementById("app"), overall = document.getElementById("overall");
+  DATA.strategies.forEach(function (strat) {
+    const sec = el("section", { class: "strategy" }, [el("h2", { text: strat.name })]);
+    const grid = el("div", { class: "accounts" });
+    strat.accounts.forEach(function (a) {
+      grid.append(accountCard(a));
+      const st = assess(a);
+      overall.append(pill(st.level, strat.name + " " + a.name.toLowerCase() + ": " + st.label));
+    });
+    sec.append(grid);
+    app.append(sec);
+  });
+  CHARTS.forEach(draw);
+  let pending = false;
+  window.addEventListener("resize", function () {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(function () {
+      pending = false;
+      CHARTS.forEach(function (c) { if (Math.round(c.clientWidth) !== c._w) draw(c); });
+    });
+  });
+})();
+</script>
+</body>
+</html>

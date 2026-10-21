@@ -3,7 +3,8 @@ Description: >-
   tqqq-blend trading server. One EC2 instance in the default VPC running two IB Gateways and the
   strategy in Docker. No inbound access: administration goes through SSM Session Manager / Run Command.
   EventBridge Scheduler starts it before the close on weekdays and stops it afterwards; each start is
-  a fresh IBKR login, so the live account sends one 2FA push a day.
+  a fresh IBKR login, so the live account sends one 2FA push a day. After the close the server
+  publishes a static dashboard to an Amplify app that only serves it behind a generated password.
   Deploy:  aws cloudformation deploy --stack-name tqqq-trading --template-file deploy/aws/stack.yml
            --capabilities CAPABILITY_IAM --region us-east-1
 
@@ -73,6 +74,11 @@ Resources:
               - Effect: Allow
                 Action: [ s3:GetObject, s3:PutObject ]
                 Resource: !Sub ${Bucket.Arn}/state/*
+              - Effect: Allow             # publish the dashboard to this one Amplify app, nothing else
+                Action: [ amplify:GetApp, amplify:GetBranch, amplify:CreateDeployment, amplify:StartDeployment, amplify:GetJob ]
+                Resource:
+                  - !Sub arn:aws:amplify:${AWS::Region}:${AWS::AccountId}:apps/${Dashboard.AppId}
+                  - !Sub arn:aws:amplify:${AWS::Region}:${AWS::AccountId}:apps/${Dashboard.AppId}/*
 
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -149,8 +155,71 @@ Resources:
         RoleArn: !GetAtt SchedulerRole.Arn
         Input: !Sub '{"InstanceIds":["${Instance}"]}'
 
+  # The dashboard: a static page the server builds from /opt/trading/state after the close and uploads
+  # (deploy/server/publish-dashboard.sh). There is no repository connection and no build: Amplify only
+  # serves what the server uploads. Basic auth is on for the app AND the branch, with a generated
+  # password kept in Secrets Manager; the publish script refuses to upload if either is off.
+  DashboardSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: tqqq-trading-dashboard
+      Description: Login for the tqqq-trading dashboard (Amplify basic auth)
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "trader"}'
+        GenerateStringKey: password
+        PasswordLength: 40
+        ExcludePunctuation: true
+
+  Dashboard:
+    Type: AWS::Amplify::App
+    Properties:
+      Name: tqqq-trading-dashboard
+      Description: Daily strategy dashboard, published by the trading server
+      Platform: WEB
+      BasicAuthConfig:
+        EnableBasicAuth: true
+        Username: !Sub '{{resolve:secretsmanager:${DashboardSecret}:SecretString:username}}'
+        Password: !Sub '{{resolve:secretsmanager:${DashboardSecret}:SecretString:password}}'
+      CustomHeaders: |
+        customHeaders:
+          - pattern: '**'
+            headers:
+              - key: Cache-Control
+                value: no-store
+              - key: X-Robots-Tag
+                value: noindex, nofollow
+              - key: X-Frame-Options
+                value: DENY
+              - key: X-Content-Type-Options
+                value: nosniff
+              - key: Referrer-Policy
+                value: no-referrer
+              - key: Strict-Transport-Security
+                value: max-age=31536000
+              - key: Content-Security-Policy
+                value: "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+  DashboardBranch:
+    Type: AWS::Amplify::Branch
+    Properties:
+      AppId: !GetAtt Dashboard.AppId
+      BranchName: main
+      Stage: PRODUCTION
+      EnableAutoBuild: false
+      BasicAuthConfig:
+        EnableBasicAuth: true
+        Username: !Sub '{{resolve:secretsmanager:${DashboardSecret}:SecretString:username}}'
+        Password: !Sub '{{resolve:secretsmanager:${DashboardSecret}:SecretString:password}}'
+
 Outputs:
   InstanceId:
     Value: !Ref Instance
   BucketName:
     Value: !Ref Bucket
+  DashboardAppId:
+    Value: !GetAtt Dashboard.AppId
+  DashboardUrl:
+    Value: !Sub https://main.${Dashboard.DefaultDomain}
+  DashboardSecret:
+    Description: aws secretsmanager get-secret-value --secret-id tqqq-trading-dashboard --query SecretString --output text
+    Value: !Ref DashboardSecret

@@ -28,6 +28,14 @@ quotes. First paper run is 2026-10-20 15:30 ET.
 
 ## History
 
+- 2026-10-21: Dashboard (branch `feat/dashboard`): `python -m tqqq_blend dashboard` builds one static page
+  from the state files (decision, performance vs QQQ/TQQQ buy-and-hold, drawdown vs halt, exposure, run
+  health, trades). On AWS, `trading-dashboard.timer` (16:35 ET) publishes it to an Amplify app behind a
+  generated basic-auth password; the publish refuses if auth is off and checks for 401 afterwards.
+  Verified locally: ruff, mypy, 29 tests incl. 4 Chromium browser tests, cfn-lint, compose config, and a
+  build in the real image with networking off. Not yet done (owner): update the deploy-user policy,
+  deploy the stack, push.sh. See tqqq-blend/deploy/README.md#dashboard.
+
 - 2026-10-21: Repository made public (it will switch between public and private for Actions
   minutes). Scan of all history, PR comments and the last 40 CI logs: no secrets or account
   numbers. Fixed the merge gate trusting verdict markers from any commenter (now owner only, with

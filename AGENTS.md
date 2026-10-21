@@ -153,7 +153,7 @@ Run strategy commands from the strategy folder (cd tqqq-blend).
 - Build: docker build -f deploy/Dockerfile .
 - Local start: uv run python -m tqqq_blend signal (read-only); run without --live is a dry run
 - Deploy (manual, merged revisions only): deploy/push.sh, see deploy/README.md
-- There is no UI, so there are no browser tests.
+- Dashboard: uv run python -m tqqq_blend dashboard (static page from state files); its browser tests (tests/test_dashboard_browser.py) need `uv run playwright install chromium` once, and CI requires them to run.
 
 ## Boundaries and definition of done
 - Orders go out only when a run passes --live AND the profile sets live_trading_enabled = true. Never weaken, default or bypass either switch, the account-type check (paper IDs start with D), the near-close window, the once-per-day guard, the kill switch (state/STOP), the drawdown halt or max_order_value.

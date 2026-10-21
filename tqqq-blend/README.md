@@ -101,6 +101,13 @@ Schwab has no paper trading API, so test against IBKR paper or the local paper b
 
 The task fires every 5 minutes from 15:30 to 15:50 ET. The first successful run of the day acts, and later runs skip. The PC has to be on and awake: the task is set to wake it, but a laptop with its lid closed may not run. For unattended live trading, use the AWS server in [deploy/](deploy/README.md). On half-days (13:00 close) the 15:30 window misses the close, so no trade happens; that's acceptable for this strategy.
 
+## Dashboard
+
+`python -m tqqq_blend dashboard` writes `state/dashboard/index.html`: each profile's latest decision,
+performance against QQQ and TQQQ buy-and-hold, drawdown, net exposure, run health and trades, read from the
+state files the runs already write. On AWS it is rebuilt after every close and published behind a password
+(see [deploy/README.md](deploy/README.md#dashboard)).
+
 ## Accounts and tax
 
 - Both traders run this in **IRAs**. About 50 trades a year in a taxable account turns most gains into short-term gains.
