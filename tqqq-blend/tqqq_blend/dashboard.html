@@ -8,45 +8,51 @@
 <style>
 :root {
   color-scheme: light;
-  --page: #f9f9f7;
+  --page: #f6f5f1;
   --surface: #fcfcfb;
-  --surface-2: #f3f2ee;
+  --surface-2: #f1f0eb;
+  --surface-3: #e8e7e0;
   --ink: #0b0b0b;
   --ink-2: #52514e;
   --muted: #898781;
-  --grid: #e1e0d9;
+  --grid: #e8e7e0;
   --axis: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.10);
+  --border: rgba(11, 11, 11, 0.08);
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --long: #2a78d6;
   --short: #e34948;
+  --cash: #b9b8b0;
   --up: #006300;
   --down: #b42323;
   --good: #0ca30c;
   --warning: #fab219;
   --critical: #d03b3b;
-  --shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 4px 16px rgba(11, 11, 11, 0.04);
+  --accent-wash: rgba(42, 120, 214, 0.08);
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 8px 24px rgba(11, 11, 11, 0.04);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --page: #0d0d0d;
     --surface: #1a1a19;
-    --surface-2: #232321;
+    --surface-2: #222220;
+    --surface-3: #2c2c2a;
     --ink: #f0efec;
     --ink-2: #c3c2b7;
     --grid: #2c2c2a;
-    --axis: #383835;
-    --border: rgba(255, 255, 255, 0.10);
+    --axis: #45453f;
+    --border: rgba(255, 255, 255, 0.08);
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
     --long: #3987e5;
     --short: #e66767;
+    --cash: #5a5a54;
     --up: #0ca30c;
     --down: #e66767;
+    --accent-wash: rgba(57, 135, 229, 0.12);
     --shadow: none;
   }
 }
@@ -54,134 +60,210 @@
   color-scheme: dark;
   --page: #0d0d0d;
   --surface: #1a1a19;
-  --surface-2: #232321;
+  --surface-2: #222220;
+  --surface-3: #2c2c2a;
   --ink: #f0efec;
   --ink-2: #c3c2b7;
   --grid: #2c2c2a;
-  --axis: #383835;
-  --border: rgba(255, 255, 255, 0.10);
+  --axis: #45453f;
+  --border: rgba(255, 255, 255, 0.08);
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
   --long: #3987e5;
   --short: #e66767;
+  --cash: #5a5a54;
   --up: #0ca30c;
   --down: #e66767;
+  --accent-wash: rgba(57, 135, 229, 0.12);
   --shadow: none;
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
 body {
   margin: 0;
   background: var(--page);
   color: var(--ink);
   font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
-.wrap { max-width: 1240px; margin: 0 auto; padding: 28px 16px 64px; }
-header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
-h1 { font-size: 26px; line-height: 1.2; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
-.sub { color: var(--ink-2); margin: 4px 0 0; font-size: 14px; }
-h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
-h3 { font-size: 14px; margin: 0 0 10px; font-weight: 600; color: var(--ink); }
+button { font: inherit; color: inherit; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+
+/* header */
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo { width: 36px; height: 36px; border-radius: 10px; background: var(--ink); display: grid; place-items: center; flex: none; }
+.logo svg { display: block; }
+h1 { font-size: 20px; line-height: 1.2; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+.sub { color: var(--ink-2); margin: 2px 0 0; font-size: 13px; }
 .theme-btn {
   border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
-  border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap;
+  border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; white-space: nowrap;
 }
 .theme-btn:hover { color: var(--ink); }
-.overall { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.strategy { margin-bottom: 40px; }
-.accounts { display: grid; align-items: start; grid-template-columns: repeat(auto-fit, minmax(min(100%, 540px), 1fr)); gap: 20px; }
-.card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
-  box-shadow: var(--shadow); padding: 20px; min-width: 0;
+
+/* banners */
+.banner { display: flex; gap: 10px; align-items: flex-start; border-radius: 12px; padding: 12px 14px; font-size: 14px; margin-bottom: 16px; background: var(--surface); border: 1px solid var(--border); }
+.banner svg, .alert svg { flex: none; margin-top: 2px; }
+
+/* overview */
+.overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; margin-bottom: 28px; }
+.ov {
+  display: block; text-decoration: none; color: inherit; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 16px 18px; box-shadow: var(--shadow); transition: border-color .15s, transform .15s;
 }
-.card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
-.card-head .name { font-size: 18px; font-weight: 650; margin-right: auto; }
-.badge {
-  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
-  padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap;
-}
-.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink); }
-.pill svg { flex: none; }
-.hero { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 4px; }
-.hero .value { font-size: 44px; line-height: 1.1; font-weight: 650; letter-spacing: -0.02em; }
-.delta { font-weight: 600; font-size: 15px; }
-.delta.up { color: var(--up); }
-.delta.down { color: var(--down); }
-.hero-note { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
-.tile { background: var(--surface-2); border-radius: 12px; padding: 12px 14px; min-width: 0; }
-.tile .label { color: var(--ink-2); font-size: 12.5px; }
-.tile .v { font-size: 20px; font-weight: 650; margin-top: 2px; }
-.tile .note { color: var(--muted); font-size: 12px; }
-.section { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
-.decision-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
-.alloc { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--surface-2); gap: 2px; margin: 8px 0 8px; }
+a.ov:hover { border-color: var(--axis); transform: translateY(-1px); }
+.ov-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.ov-name { font-weight: 650; font-size: 15px; }
+.ov-strategy { color: var(--muted); font-size: 12.5px; }
+.ov-head .pill { margin-left: auto; }
+.ov-value { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.15; }
+.ov-line { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); margin-top: 6px; }
+.ov-empty { color: var(--ink-2); font-size: 13.5px; }
+
+.badge { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.up { color: var(--up); }
+.down { color: var(--down); }
+
+/* strategy + account */
+.strategy-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+.account { margin-bottom: 36px; scroll-margin-top: 16px; }
+.acct-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.acct-head h2 { font-size: 22px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+.acct-head .last { margin-left: auto; color: var(--muted); font-size: 13px; }
+.alerts { display: grid; gap: 8px; margin-bottom: 14px; }
+.alert { display: flex; gap: 10px; align-items: flex-start; border-radius: 12px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); font-size: 13.5px; }
+.notes { color: var(--muted); font-size: 12.5px; margin: -6px 0 14px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 18px 20px; min-width: 0; }
+.card h3 { font-size: 14px; margin: 0; font-weight: 650; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.card-sub { color: var(--muted); font-size: 12.5px; }
+
+/* KPIs */
+.kpis { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 14px 16px; min-width: 0; }
+.kpi .label { color: var(--ink-2); font-size: 12.5px; }
+.kpi .v { font-size: 22px; font-weight: 650; margin-top: 2px; letter-spacing: -0.01em; }
+.kpi .note { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.kpi.hero .v { font-size: 34px; line-height: 1.1; }
+.kpi.hero .deltas { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; font-weight: 600; margin-top: 4px; }
+.kpi.hero .deltas span.lbl { color: var(--muted); font-weight: 400; }
+.meter { height: 6px; border-radius: 3px; background: var(--surface-3); margin: 8px 0 4px; overflow: hidden; }
+.meter span { display: block; height: 100%; border-radius: 3px; }
+
+/* layout grid */
+.grid-main { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; margin-bottom: 12px; }
+.stack { display: grid; gap: 12px; align-content: start; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* range chips + tabs */
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; border-radius: 999px; padding: 4px 11px; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
+.seg button[aria-pressed="true"], .seg button[aria-selected="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.seg button:focus-visible, .ov:focus-visible, .theme-btn:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+
+/* decision */
+.target { font-size: 18px; font-weight: 650; margin: 4px 0 8px; }
+.alloc { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--surface-2); gap: 2px; }
 .alloc span { display: block; height: 100%; }
-.alloc-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--ink-2); }
+.alloc-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-2); margin-top: 8px; }
 .key { display: inline-flex; align-items: center; gap: 6px; }
 .key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
 .key i.line { width: 14px; height: 2px; border-radius: 1px; }
-dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 13.5px; }
-dl.kv dt { color: var(--ink-2); }
-dl.kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
-.orders { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13.5px; }
-.orders li { padding: 2px 0; }
-.chart { position: relative; margin-top: 4px; }
+.orders { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 6px; }
+.orders li { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.side { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 6px; background: var(--surface-2); }
+.side.buy { color: var(--up); }
+.side.sell { color: var(--down); }
+.section-label { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; margin: 18px 0 8px; }
+.signals { display: grid; grid-template-columns: auto minmax(80px, 1fr) auto; gap: 8px 12px; align-items: center; font-size: 13.5px; }
+.signals .name { color: var(--ink-2); white-space: nowrap; }
+.signals .val { font-variant-numeric: tabular-nums; text-align: right; min-width: 3.2em; }
+.signals .name.strong, .signals .val.strong { color: var(--ink); font-weight: 650; }
+.sbar { position: relative; height: 8px; border-radius: 4px; background: var(--surface-2); }
+.sbar .mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--axis); }
+.sbar .fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12.5px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
+.foot { color: var(--muted); font-size: 12.5px; margin-top: 16px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+
+/* charts */
+.chart { position: relative; }
 .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
 .chart .axis text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .chart .grid line { stroke: var(--grid); stroke-width: 1; }
 .chart .baseline { stroke: var(--axis); stroke-width: 1; }
 .chart .end-label { fill: var(--ink-2); font-size: 11.5px; font-weight: 600; }
 .chart .ref-label { fill: var(--ink-2); font-size: 11px; }
-.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 6px; }
-.chart-empty { color: var(--muted); font-size: 13px; padding: 18px 0; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 4px; }
+.chart-empty { color: var(--muted); font-size: 13px; padding: 28px 0; text-align: center; }
 .tip {
   position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
-  min-width: 150px; z-index: 5; display: none;
+  border-radius: 10px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+  min-width: 160px; z-index: 5; display: none;
 }
 .tip .d { color: var(--muted); margin-bottom: 4px; }
-.tip .row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.tip .row { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
 .tip .row b { font-variant-numeric: tabular-nums; }
 .tip .row span { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
 .tip .row i { display: inline-block; width: 12px; height: 2px; border-radius: 1px; }
-.charts { display: grid; gap: 22px; }
-details { margin-top: 12px; }
-summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 6px 0; color: var(--ink); }
-summary::marker { color: var(--muted); }
+
+/* tables */
 .table-wrap { overflow-x: auto; margin-top: 6px; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; padding: 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.when { white-space: nowrap; color: var(--ink-2); }
+.status { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+@media (min-width: 641px) { td.wide { min-width: 140px; } }
+.more { margin-top: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 5px 14px; font-size: 13px; cursor: pointer; }
+.more:hover { color: var(--ink); }
 .empty { color: var(--ink-2); background: var(--surface-2); border-radius: 12px; padding: 16px; font-size: 14px; }
-.alerts { display: grid; gap: 8px; margin-bottom: 16px; }
-.alert { display: flex; gap: 10px; align-items: flex-start; border-radius: 10px; padding: 10px 12px; background: var(--surface-2); font-size: 13.5px; }
-.alert svg { flex: none; margin-top: 2px; }
-footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
-@media (max-width: 520px) {
-  .hero .value { font-size: 36px; }
-  .card { padding: 16px; border-radius: 14px; }
-  header.top { flex-direction: column; }
+.missed { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 1.6; }
+
+@media (max-width: 1080px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .kpi.hero { grid-column: 1 / -1; }
+  .grid-main { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .pair { grid-template-columns: 1fr; }
+  .card { padding: 16px; }
+  .kpi.hero .v { font-size: 30px; }
+  .acct-head .last { margin-left: 0; width: 100%; }
+  th.opt, td.opt { display: none; }
+  th, td { padding: 7px 5px; }
 }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div>
-      <h1>Trading dashboard</h1>
-      <p class="sub" id="generated"></p>
-      <div class="overall" id="overall"></div>
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20"><path d="M2 14l5-5 3.5 3.5L18 5" fill="none" stroke="var(--page)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <h1>Trading dashboard</h1>
+        <p class="sub" id="generated"></p>
+      </div>
     </div>
     <button class="theme-btn" id="theme" type="button">Theme: auto</button>
   </header>
+  <div id="stale"></div>
+  <nav class="overview" id="overview" aria-label="Accounts at a glance"></nav>
   <main id="app"></main>
   <footer>
     Equity and prices are as of each run's decision time (about 15:30 ET), not the official close.
     Benchmarks are buy-and-hold over the same run days, from the prices each run recorded.
+    The page is rebuilt after the close on weekdays; nothing on it can place or change orders.
   </footer>
 </div>
 <script id="dashboard-data" type="application/json">__DASHBOARD_DATA__</script>
@@ -213,11 +295,12 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
   function el(tag, attrs, children) {
     const n = document.createElement(tag);
     if (attrs) for (const k in attrs) {
+      if (attrs[k] == null) continue;
       if (k === "class") n.className = attrs[k];
       else if (k === "text") n.textContent = attrs[k];
       else n.setAttribute(k, attrs[k]);
     }
-    (children || []).forEach(function (c) { if (c != null) n.append(c); });
+    (children || []).forEach(function (c) { if (c != null && c !== false) n.append(c); });
     return n;
   }
   function svg(tag, attrs) {
@@ -228,14 +311,22 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
   const isNum = function (x) { return typeof x === "number" && isFinite(x); };
   const money = function (x, dp) {
     if (!isNum(x)) return "—";
-    return x.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: dp == null ? 0 : dp, minimumFractionDigits: dp == null ? 0 : dp });
+    const d = dp == null ? 0 : dp;
+    return x.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: d, minimumFractionDigits: d }).replace("-", "−");
   };
-  const pct = function (x, dp, signed) {
+  // Sign from the rounded value, so anything that rounds to zero shows as 0, never "−0.0".
+  function signed(abs, raw, plus) {
+    if (+abs === 0) return abs;
+    return raw < 0 ? "−" + abs : (plus && raw > 0 ? "+" + abs : abs);
+  }
+  const pct = function (x, dp, plus) {
     if (!isNum(x)) return "—";
-    const s = (x * 100).toFixed(dp == null ? 1 : dp) + "%";
-    return signed && x > 0 ? "+" + s : s.replace("-", "−");
+    const abs = (Math.abs(x) * 100).toFixed(dp == null ? 1 : dp);
+    return signed(abs, x, plus) + "%";
   };
-  const num = function (x, dp) { return isNum(x) ? x.toFixed(dp == null ? 2 : dp).replace("-", "−") : "—"; };
+  const num = function (x, dp) { return isNum(x) ? signed(Math.abs(x).toFixed(dp == null ? 2 : dp), x, false) : "—"; };
+  const dirClass = function (x) { return !isNum(x) || Math.abs(x) < 5e-5 ? "" : x > 0 ? "up" : "down"; };
+  function hasOffset(ts) { return /(Z|[+-]\d\d:\d\d)$/.test(ts); }
   function fmtDate(d) {
     if (!d) return "—";
     const dt = new Date(d.length === 10 ? d + "T12:00:00" : d);
@@ -246,54 +337,88 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
     const dt = new Date(ts);
     if (isNaN(dt)) return ts;
     // Run timestamps are ET wall time with no offset; a timestamp with an offset is shown in ET too.
-    const tz = /(Z|[+-]\d\d:\d\d)$/.test(ts) ? { timeZone: "America/New_York" } : {};
-    return dt.toLocaleDateString("en-US", Object.assign({ month: "short", day: "numeric" }, tz)) + " " +
+    const tz = hasOffset(ts) ? { timeZone: "America/New_York" } : {};
+    return dt.toLocaleDateString("en-US", Object.assign({ weekday: "short", month: "short", day: "numeric" }, tz)) + ", " +
       dt.toLocaleTimeString("en-US", Object.assign({ hour: "numeric", minute: "2-digit" }, tz));
   }
+  const shortDate = function (d) { return new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
 
   // ---- status: icon + label, never color alone ----
   const ICONS = {
-    good: "M4 8.5l2.5 2.5L12 5.5",
-    warning: "M8 4.5v4M8 11.2v.3",
-    critical: "M5.5 5.5l5 5M10.5 5.5l-5 5",
-    info: "M8 7.5v4M8 4.8v.3",
+    good: "M4.5 8.3l2.3 2.3L11.5 6",
+    warning: "M8 4.6v4.2M8 11.3v.2",
+    critical: "M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8",
+    info: "M8 7.4v4M8 4.9v.2",
   };
-  function statusIcon(level) {
-    const s = svg("svg", { width: 16, height: 16, viewBox: "0 0 16 16", "aria-hidden": "true" });
-    const color = level === "good" ? "var(--good)" : level === "warning" ? "var(--warning)" : level === "critical" ? "var(--critical)" : "var(--muted)";
-    s.append(svg("circle", { cx: 8, cy: 8, r: 7.5, fill: color }));
+  const LEVEL_COLOR = { good: "var(--good)", warning: "var(--warning)", critical: "var(--critical)", info: "var(--muted)" };
+  function statusIcon(level, size) {
+    const s = svg("svg", { width: size || 16, height: size || 16, viewBox: "0 0 16 16", "aria-hidden": "true" });
+    s.append(svg("circle", { cx: 8, cy: 8, r: 7.5, fill: LEVEL_COLOR[level] || LEVEL_COLOR.info }));
     s.append(svg("path", { d: ICONS[level] || ICONS.info, stroke: level === "warning" ? "#0b0b0b" : "#fff", "stroke-width": 1.8, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }));
     return s;
   }
   function pill(level, text) { return el("span", { class: "pill" }, [statusIcon(level), el("span", { text: text })]); }
 
+  function runLevel(status) {
+    const s = String(status || "");
+    if (s.startsWith("error") || s.startsWith("halted")) return "critical";
+    if (s === "executed") return "good";
+    if (s.startsWith("skipped")) return "warning";
+    return "info";
+  }
+
+  // ---- health of one account ----
   function assess(a) {
-    const alerts = [];
+    const alerts = [], notes = [];
     if (a.kill_switch) alerts.push(["critical", "Kill switch is on (state/STOP exists): runs stop before trading."]);
     if (a.halted) alerts.push(["critical", "Halted: " + a.halted + ". Clear 'halted' in state.json to resume."]);
     const last = a.last_run;
-    if (last && String(last.status || "").startsWith("error")) alerts.push(["critical", "Last run failed: " + last.status]);
+    const lastFailed = last && String(last.status || "").startsWith("error");
+    if (lastFailed) alerts.push(["critical", "Last run failed: " + last.status]);
     if (last && a.due_through && a.due_through !== "None" && String(last.ts).slice(0, 10) < a.due_through)
       alerts.push(["warning", "No run recorded for " + fmtDate(a.due_through) + " (last run " + fmtTime(last.ts) + ")."]);
     // the latest due day already has its own alert above
     const missed = (a.missed_days || []).filter(function (d) { return d !== a.due_through; });
     if (missed.length) alerts.push(["warning", missed.length + " earlier trading day(s) with no run, most recently " + fmtDate(missed[missed.length - 1]) + "."]);
     if (a.unreadable_run_lines) alerts.push(["warning", a.unreadable_run_lines + " line(s) in runs.jsonl could not be read and are left out."]);
-    if (a.errors_30d && !(last && String(last.status || "").startsWith("error"))) alerts.push(["info", a.errors_30d + " failed run(s) in the last 30 days."]);
+    if (a.errors_30d && !lastFailed) notes.push(a.errors_30d + " failed run(s) in the last 30 days, since recovered.");
     let level = "good", label = "Healthy";
     if (!a.runs_total) { level = "info"; label = "No runs yet"; }
     if (alerts.some(function (x) { return x[0] === "warning"; })) { level = "warning"; label = "Needs a look"; }
     if (alerts.some(function (x) { return x[0] === "critical"; })) { level = "critical"; label = a.halted || a.kill_switch ? "Halted" : "Failing"; }
-    return { level: level, label: label, alerts: alerts };
+    return { level: level, label: label, alerts: alerts, notes: notes };
   }
 
-  const MODE = {
-    "paper": "Paper account",
-    "live": "Live · orders on",
-    "live-disabled": "Live · orders off (dry run)",
-  };
+  const MODE = { "paper": "Simulated money", "live": "Real money · orders on", "live-disabled": "Real money · dry run" };
 
-  // ---- charts: inline SVG, one y-axis, crosshair + one tooltip listing every series ----
+  // ---- the page is stale if a weekday close has passed since it was built ----
+  function etParts(d) {
+    const f = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false, weekday: "short" });
+    const p = {}; f.formatToParts(d).forEach(function (x) { p[x.type] = x.value; });
+    return { date: p.year + "-" + p.month + "-" + p.day, hm: (+p.hour % 24) * 60 + +p.minute, wd: p.weekday };
+  }
+  function lastPublishDue(now) {
+    // Walk back from now (ET) to the latest weekday whose 16:45 has passed: the page should be at least that new.
+    const t = new Date(now.getTime());
+    for (let i = 0; i < 8; i++) {
+      const p = etParts(t);
+      const weekday = p.wd !== "Sat" && p.wd !== "Sun";
+      if (weekday && (i > 0 || p.hm >= 16 * 60 + 45)) return p.date;
+      t.setTime(t.getTime() - 24 * 3600 * 1000);
+    }
+    return null;
+  }
+  function staleBanner() {
+    const gen = String(DATA.generated || "").slice(0, 10);
+    const due = lastPublishDue(new Date());
+    if (!gen || !due || gen >= due) return null;
+    return el("div", { class: "banner", role: "alert" }, [statusIcon("warning"), el("span", {
+      text: "This page was last rebuilt on " + fmtDate(gen) + ", before the " + fmtDate(due) +
+        " close. The daily publish may have failed: check the trading-dashboard timer on the server.",
+    })]);
+  }
+
+  // ---- charts: inline SVG at their real width, one y-axis, crosshair + one tooltip listing every series ----
   function niceTicks(lo, hi, count) {
     if (lo === hi) { lo -= 1; hi += 1; }
     const raw = (hi - lo) / count;
@@ -304,7 +429,6 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
     return ticks;
   }
 
-  // Charts draw at their real width (so text stays 11px on a phone) and redraw when it changes.
   const CHARTS = [];
   function chart(opts) {
     const wrap = el("div", { class: "chart" });
@@ -314,14 +438,14 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
   }
 
   function draw(wrap) {
-    // opts: dates[], series[{name, color, values[], area?}], yFmt, tipFmt, refLine?{y,label}, bars?
+    // opts: dates[], series[{name, short, color, values[], area?}], yFmt, tipFmt, refLine?{y,label}, bars?
     const opts = wrap._opts;
     wrap.replaceChildren();
     opts.series.forEach(function (ser) { ser._last = null; });
     const n = opts.dates.length;
-    const W = Math.max(280, Math.round(wrap.clientWidth || 640));
+    const W = Math.max(260, Math.round(wrap.clientWidth || 600));
     wrap._w = W;
-    const H = opts.height || 220, M = { t: 10, r: opts.endLabels ? 92 : 16, b: 26, l: 52 };
+    const H = opts.height || 220, M = { t: 12, r: opts.endLabels ? 96 : 12, b: 26, l: 50 };
     const iw = W - M.l - M.r, ih = H - M.t - M.b;
     const all = [];
     opts.series.forEach(function (s) { s.values.forEach(function (v) { if (isNum(v)) all.push(v); }); });
@@ -329,7 +453,7 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
     if (opts.zero) all.push(0);
     if (n < 2 || all.length < 2) {
       wrap.append(el("div", { class: "chart-empty", text: "The chart appears after two days of runs." }));
-      return wrap;
+      return;
     }
     let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
     const pad = (hi - lo || Math.abs(hi) || 1) * 0.08;
@@ -337,10 +461,13 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
     if (!opts.zero || hi > 0) hi += pad;
     if (opts.clampMax != null) hi = Math.min(hi, opts.clampMax);
     // the axis runs from one round tick to the next, so the top and bottom of the plot are labelled
-    let ticks = niceTicks(lo, hi, 4);
+    let ticks = niceTicks(lo, hi, opts.height && opts.height < 200 ? 3 : 4);
     if (opts.clampMax != null) ticks = ticks.filter(function (t) { return t <= opts.clampMax + 1e-9; });
     lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]);
-    const x = function (i) { return M.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw); };
+    // Bars sit in equal bands, so the first and last bar stay inside the plot; lines run edge to edge.
+    const x = opts.bars
+      ? function (i) { return M.l + ((i + 0.5) / n) * iw; }
+      : function (i) { return M.l + (i / (n - 1)) * iw; };
     const y = function (v) { return M.t + ih - ((v - lo) / (hi - lo)) * ih; };
 
     const s = svg("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opts.label });
@@ -352,10 +479,14 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
       axis.append(tx);
     });
     const xt = Math.min(W < 420 ? 3 : 5, n);
+    const seen = {};
     for (let k = 0; k < xt; k++) {
       const i = Math.round((k / (xt - 1 || 1)) * (n - 1));
-      const tx = svg("text", { x: x(i), y: H - 6, "text-anchor": k === 0 ? "start" : k === xt - 1 ? "end" : "middle" });
-      tx.textContent = new Date(opts.dates[i] + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      if (seen[i]) continue;
+      seen[i] = 1;
+      const anchor = opts.bars ? "middle" : k === 0 ? "start" : k === xt - 1 ? "end" : "middle";
+      const tx = svg("text", { x: x(i), y: H - 6, "text-anchor": anchor });
+      tx.textContent = shortDate(opts.dates[i]);
       axis.append(tx);
     }
     s.append(grid, axis);
@@ -363,7 +494,7 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
     if (base != null && base >= lo && base <= hi) s.append(svg("line", { class: "baseline", x1: M.l, x2: W - M.r, y1: y(base), y2: y(base) }));
 
     if (opts.bars) {
-      const bw = Math.max(1, Math.min(24, iw / n - 2));
+      const bw = Math.max(1, Math.min(24, (iw / n) * 0.7));
       opts.series[0].values.forEach(function (v, i) {
         if (!isNum(v) || v === 0) return;
         const y0 = y(0), y1 = y(v), h = Math.abs(y1 - y0), r = Math.min(4, h, bw / 2);
@@ -420,7 +551,7 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
       s.append(c); return c;
     });
     s.append(cross);
-    const hit = svg("rect", { x: M.l, y: 0, width: iw, height: H, fill: "transparent", tabindex: 0 });
+    const hit = svg("rect", { x: M.l, y: 0, width: iw, height: H, fill: "transparent", tabindex: 0, "aria-label": opts.label + ": use the arrow keys to read values" });
     s.append(hit);
     const tip = el("div", { class: "tip", role: "status" });
     wrap.append(s, tip);
@@ -450,10 +581,12 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
       dots.forEach(function (d) { d.setAttribute("visibility", "hidden"); });
     }
     let cur = n - 1;
+    const index = opts.bars
+      ? function (px) { return Math.floor(((px - M.l) / iw) * n); }
+      : function (px) { return Math.round(((px - M.l) / iw) * (n - 1)); };
     hit.addEventListener("pointermove", function (ev) {
       const rect = s.getBoundingClientRect();
-      const px = (ev.clientX - rect.left) * (W / rect.width);
-      cur = Math.max(0, Math.min(n - 1, Math.round(((px - M.l) / iw) * (n - 1))));
+      cur = Math.max(0, Math.min(n - 1, index((ev.clientX - rect.left) * (W / rect.width))));
       show(cur);
     });
     hit.addEventListener("pointerleave", hide);
@@ -463,7 +596,6 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
       if (ev.key === "ArrowLeft") { cur = Math.max(0, cur - 1); show(cur); ev.preventDefault(); }
       if (ev.key === "ArrowRight") { cur = Math.min(n - 1, cur + 1); show(cur); ev.preventDefault(); }
     });
-    return wrap;
   }
 
   function legend(items) {
@@ -473,181 +605,364 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 40px; }
     }));
   }
 
-  // ---- account card ----
-  function tile(label, value, note, cls) {
-    return el("div", { class: "tile" }, [
+  // ---- overview card (one per account) ----
+  function overviewCard(strat, a, st) {
+    const m = a.metrics, ser = a.series || [];
+    const attrs = { class: "ov" };
+    let node;
+    if (a.runs_total) { attrs.href = "#" + a._id; node = el("a", attrs); } else node = el("div", attrs);
+    node.append(el("div", { class: "ov-head" }, [
+      el("span", { class: "ov-name", text: a.name }),
+      el("span", { class: "badge", text: MODE[a.mode] || a.mode }),
+      pill(st.level, st.label),
+    ]));
+    if (!a.runs_total) {
+      node.append(el("div", { class: "ov-empty", text: a.mode === "live-disabled"
+        ? "No runs yet. Dry runs start once this account's login is on the server; orders stay off until enabled."
+        : "No runs recorded yet." }));
+      return node;
+    }
+    if (m) {
+      const day = ser.length >= 2 && isNum(ser[ser.length - 1].equity) && isNum(ser[ser.length - 2].equity) && ser[ser.length - 2].equity
+        ? ser[ser.length - 1].equity / ser[ser.length - 2].equity - 1 : null;
+      node.append(el("div", { class: "ov-value", text: money(m.equity) }));
+      node.append(el("div", { class: "ov-line" }, [
+        el("span", null, [el("span", { text: "Last day " }), el("b", { class: dirClass(day), text: pct(day, 2, true) })]),
+        el("span", null, [el("span", { text: "Since start " }), el("b", { class: dirClass(m.return), text: pct(m.return, 2, true) })]),
+      ]));
+    }
+    const last = a.last_run;
+    node.append(el("div", { class: "ov-line" }, [el("span", { text: strat + " · last run " + fmtTime(last && last.ts) + " · " + (last && last.status || "—") })]));
+    return node;
+  }
+
+  // ---- KPI row ----
+  function kpi(label, value, note, extra, cls) {
+    return el("div", { class: "kpi" + (cls ? " " + cls : "") }, [
       el("div", { class: "label", text: label }),
-      el("div", { class: "v" + (cls ? " " + cls : ""), text: value }),
+      el("div", { class: "v", text: value }),
+      extra || null,
       note ? el("div", { class: "note", text: note }) : null,
     ]);
   }
-
-  function relClass(x) { return !isNum(x) || x === 0 ? "" : x > 0 ? "delta up" : "delta down"; }
-
-  function decisionSection(a) {
-    const d = a.decision, sym = a.symbols;
-    const sec = el("div", { class: "section" }, [el("h3", { text: "Latest decision" })]);
-    if (!d) { sec.append(el("div", { class: "empty", text: "No run has computed a signal yet." })); return sec; }
-    const wl = isNum(d.w_long) ? d.w_long : 0, ws = isNum(d.w_short) ? d.w_short : 0, cash = Math.max(0, 1 - wl - ws);
-    const bar = el("div", { class: "alloc", role: "img", "aria-label": "Target: " + pct(wl, 0) + " " + sym.long + ", " + pct(ws, 0) + " " + sym.short + ", " + pct(cash, 0) + " cash" });
-    [[wl, "var(--long)"], [ws, "var(--short)"], [cash, "var(--muted)"]].forEach(function (p) {
-      if (p[0] > 0) { const s = el("span"); s.style.width = (p[0] * 100) + "%"; s.style.background = p[1]; bar.append(s); }
-    });
-    const lk = function (c, t) { const i = el("i"); i.style.background = c; return el("span", { class: "key" }, [i, document.createTextNode(t)]); };
-    const orders = (d.orders || []);
-    const left = el("div", null, [
-      el("div", { class: "sub", text: fmtTime(d.ts) + " · " + (d.status || "—") }),
-      bar,
-      el("div", { class: "alloc-legend" }, [lk("var(--long)", sym.long + " " + pct(wl, 0)), lk("var(--short)", sym.short + " " + pct(ws, 0)), lk("var(--muted)", "Cash " + pct(cash, 0))]),
-      el("ul", { class: "orders" }, orders.length
-        ? orders.map(function (o) { return el("li", { text: o.side + " " + o.quantity + " " + o.symbol + " (" + o.order_type + ")" }); })
-        : [el("li", { class: "sub", text: d.status && String(d.status).startsWith("error") ? "No orders: the run stopped." : "No orders: inside the rebalance band." })]),
+  function kpis(a) {
+    const m = a.metrics, ser = a.series || [];
+    const day = ser.length >= 2 && isNum(ser[ser.length - 1].equity) && isNum(ser[ser.length - 2].equity) && ser[ser.length - 2].equity
+      ? ser[ser.length - 1].equity / ser[ser.length - 2].equity - 1 : null;
+    const hero = el("div", { class: "kpi hero" }, [
+      el("div", { class: "label", text: "Strategy equity" }),
+      el("div", { class: "v", text: money(m.equity) }),
+      el("div", { class: "deltas" }, [
+        el("span", null, [el("span", { class: "lbl", text: "Last day " }), el("span", { class: dirClass(day), text: pct(day, 2, true) })]),
+        el("span", null, [el("span", { class: "lbl", text: "Since " + shortDate(m.start_date) + " " }), el("span", { class: dirClass(m.return), text: pct(m.return, 2, true) })]),
+      ]),
+      el("div", { class: "note", text: "Started at " + money(m.start_equity) + " · allotted " + money(a.capital) }),
     ]);
-    const kv = el("dl", { class: "kv" });
-    [
-      ["Net exposure", num(d.net, 2)],
-      ["Trend sleeve", num(d.trend, 2)],
-      ["Mean-reversion sleeve", num(d.mr, 2)],
-      ["Market-timing sleeve", num(d.vibha, 2)],
-      ["Volatility scale", num(d.vol_scale, 2)],
-      ["Distribution days", d.dist_days == null ? "—" : String(d.dist_days)],
-      ["Sell flags", d.sell_flags == null ? "—" : String(d.sell_flags)],
-      ["Timing event", d.vibha_event ? String(d.vibha_event) : "none"],
-      [sym.signal + " price", money(d.qqq, 2)],
-      ["Quotes from", d.quote_source === "finviz" ? "Finviz (real time)" : d.quote_source ? String(d.quote_source).toUpperCase() + " (may be delayed)" : "—"],
-    ].forEach(function (r) { kv.append(el("dt", { text: r[0] }), el("dd", { text: r[1] })); });
-    sec.append(el("div", { class: "decision-grid" }, [left, kv]));
-    return sec;
+    const vs = function (b) {
+      if (!isNum(m.return) || !isNum(b)) return null;
+      const d = (m.return - b) * 100;
+      return "Strategy " + (d >= 0 ? "ahead by " : "behind by ") + Math.abs(d).toFixed(1) + " pts";
+    };
+    // drawdown meter: how far the current drawdown has gone toward the halt line
+    const used = isNum(m.drawdown) && a.halt_drawdown ? Math.min(1, Math.abs(m.drawdown) / a.halt_drawdown) : 0;
+    const meter = el("div", { class: "meter", role: "img", "aria-label": pct(used, 0) + " of the way to the drawdown halt" });
+    const fill = el("span");
+    fill.style.width = Math.max(used * 100, used > 0 ? 2 : 0) + "%";
+    fill.style.background = used < 0.33 ? "var(--good)" : used < 0.66 ? "var(--warning)" : "var(--critical)";
+    meter.append(fill);
+    return el("div", { class: "kpis" }, [
+      hero,
+      kpi(a.symbols.signal + " buy and hold", pct(m.qqq_return, 2, true), vs(m.qqq_return)),
+      kpi(a.symbols.long + " buy and hold", pct(m.long_return, 2, true), vs(m.long_return)),
+      kpi("Drawdown from peak", pct(m.drawdown, 1), "Worst " + pct(m.max_drawdown, 1) + " · halts at " + pct(-a.halt_drawdown, 0), meter),
+      kpi("Trades", String(a.trades_total || 0), m.days + " trading days · " + a.runs_total + " runs"),
+    ]);
   }
 
-  function chartsSection(a) {
-    const ser = a.series || [], sym = a.symbols, dates = ser.map(function (p) { return p.date; });
-    const sec = el("div", { class: "section charts" });
+  // ---- decision panel ----
+  function signalRow(name, v, strong, range01) {
+    const bar = el("div", { class: "sbar", role: "img", "aria-label": name + " " + num(v, 2) });
+    if (!range01) bar.append(el("span", { class: "mid" }));
+    if (isNum(v)) {
+      const f = el("span", { class: "fill" });
+      if (range01) { f.style.left = "0"; f.style.width = Math.min(100, Math.max(0, v * 100)) + "%"; f.style.background = "var(--axis)"; }
+      else {
+        const c = Math.max(-1, Math.min(1, v));
+        f.style.left = (c >= 0 ? 50 : 50 + c * 50) + "%";
+        f.style.width = Math.abs(c) * 50 + "%";
+        f.style.background = c >= 0 ? "var(--long)" : "var(--short)";
+      }
+      bar.append(f);
+    }
+    return [el("span", { class: "name" + (strong ? " strong" : ""), text: name }), bar, el("span", { class: "val" + (strong ? " strong" : ""), text: num(v, 2) })];
+  }
+
+  function decisionCard(a) {
+    const d = a.decision, sym = a.symbols;
+    const card = el("section", { class: "card decision", "aria-label": "Latest decision" });
+    if (!d) {
+      card.append(el("div", { class: "card-head" }, [el("h3", { text: "Latest decision" })]));
+      card.append(el("div", { class: "empty", text: "No run has computed a signal yet." }));
+      return card;
+    }
+    card.append(el("div", { class: "card-head" }, [
+      el("h3", { text: "Latest decision" }),
+      el("span", { class: "status card-sub" }, [statusDot(d.status), el("span", { text: fmtTime(d.ts) + " · " + (d.status || "—") })]),
+    ]));
+    const wl = isNum(d.w_long) ? d.w_long : 0, ws = isNum(d.w_short) ? d.w_short : 0, cash = Math.max(0, 1 - wl - ws);
+    const parts = [];
+    if (wl > 0) parts.push(pct(wl, 0) + " " + sym.long);
+    if (ws > 0) parts.push(pct(ws, 0) + " " + sym.short);
+    parts.push(pct(cash, 0) + " cash");
+    card.append(el("div", { class: "target", text: "Target: " + parts.join(" · ") }));
+    const bar = el("div", { class: "alloc", role: "img", "aria-label": "Target allocation: " + parts.join(", ") });
+    [[wl, "var(--long)"], [ws, "var(--short)"], [cash, "var(--cash)"]].forEach(function (p) {
+      if (p[0] > 0) { const s = el("span"); s.style.width = (p[0] * 100) + "%"; s.style.background = p[1]; bar.append(s); }
+    });
+    card.append(bar);
+    const lk = function (c, t) { const i = el("i"); i.style.background = c; return el("span", { class: "key" }, [i, document.createTextNode(t)]); };
+    card.append(el("div", { class: "alloc-legend" }, [lk("var(--long)", sym.long + " (long)"), lk("var(--short)", sym.short + " (short)"), lk("var(--cash)", "Cash")]));
+
+    const orders = d.orders || [];
+    const failed = d.status && String(d.status).startsWith("error");
+    card.append(el("ul", { class: "orders", "aria-label": "Orders" }, orders.length
+      ? orders.map(function (o) {
+        return el("li", null, [
+          el("span", { class: "side " + String(o.side).toLowerCase(), text: o.side }),
+          el("span", { text: o.quantity + " " + o.symbol }),
+          el("span", { class: "card-sub", text: o.order_type === "MOC" ? "market on close" : String(o.order_type || "").toLowerCase() }),
+        ]);
+      })
+      : [el("li", { class: "card-sub", text: failed ? "No orders: the run stopped before trading." : "No orders: already within the rebalance band." })]));
+
+    card.append(el("div", { class: "section-label", text: "Why" }));
+    const sig = el("div", { class: "signals" });
+    [
+      signalRow("Net exposure", d.net, true),
+      signalRow("Trend", d.trend),
+      signalRow("Mean reversion", d.mr),
+      signalRow("Market timing", d.vibha),
+      signalRow("Volatility scale", d.vol_scale, false, true),
+    ].forEach(function (r) { r.forEach(function (c) { sig.append(c); }); });
+    card.append(sig);
+
+    card.append(el("div", { class: "section-label", text: "Market flags" }));
+    card.append(el("div", { class: "chips" }, [
+      el("span", { class: "chip", text: (d.dist_days == null ? "—" : d.dist_days) + " distribution days" }),
+      el("span", { class: "chip", text: (d.sell_flags == null ? "—" : d.sell_flags) + " sell flags" }),
+      el("span", { class: "chip", text: "Timing event: " + (d.vibha_event ? String(d.vibha_event) : "none") }),
+    ]));
+    card.append(el("div", { class: "foot" }, [
+      el("span", { text: sym.signal + " " + money(d.qqq, 2) }),
+      el("span", { text: "Quotes: " + (d.quote_source === "finviz" ? "Finviz, real time" : d.quote_source ? String(d.quote_source).toUpperCase() + ", may be delayed" : "—") }),
+    ]));
+    return card;
+  }
+
+  function statusDot(status) {
+    const dot = el("span", { class: "dot" });
+    dot.style.background = LEVEL_COLOR[runLevel(status)];
+    return dot;
+  }
+
+  // ---- charts for one account, scoped by the range control ----
+  const RANGES = [["1M", 31], ["3M", 92], ["YTD", "ytd"], ["All", null]];
+  function sliceStart(ser, range) {
+    if (range == null || !ser.length) return 0;
+    const last = new Date(ser[ser.length - 1].date + "T12:00:00");
+    const from = range === "ytd" ? new Date(last.getFullYear(), 0, 1) : new Date(last.getTime() - range * 86400000);
+    const i = ser.findIndex(function (p) { return new Date(p.date + "T12:00:00") >= from; });
+    return Math.max(0, Math.min(i < 0 ? 0 : i, ser.length - 2));
+  }
+
+  function chartOpts(a, start) {
+    const full = a.series || [], sym = a.symbols;
+    // drawdown uses the running peak over the whole history, then the range is cut from it
+    let peak = -Infinity;
+    const ddAll = full.map(function (p) {
+      if (!isNum(p.equity)) return null;
+      peak = Math.max(peak, p.equity);
+      return peak > 0 ? p.equity / peak - 1 : null;
+    });
+    const ser = full.slice(start), dates = ser.map(function (p) { return p.date; });
     const idx = function (key) {
       const first = ser.find(function (p) { return isNum(p[key]) && p[key] > 0; });
       return ser.map(function (p) { return first && isNum(p[key]) ? (p[key] / first[key]) * 100 : null; });
     };
-    const growth = [
-      { name: "Strategy", short: "Strategy", color: "var(--series-1)", values: idx("equity") },
-      { name: sym.signal + " buy and hold", short: sym.signal, color: "var(--series-2)", values: idx("qqq") },
-      { name: sym.long + " buy and hold", short: sym.long, color: "var(--series-3)", values: idx("long_px") },
-    ];
-    sec.append(el("div", null, [
-      el("h3", { text: "Growth of $100" }),
-      legend(growth.map(function (g) { return { name: g.name, color: g.color, line: true }; })),
-      chart({ label: "Growth of $100: strategy against buy and hold", dates: dates, series: growth, baseline: 100, endLabels: true,
+    return {
+      growth: { label: "Growth of $100: strategy against buy and hold", dates: dates, baseline: 100, endLabels: true, height: 260,
+        series: [
+          { name: "Strategy", short: "Strategy", color: "var(--series-1)", values: idx("equity") },
+          { name: sym.signal + " buy and hold", short: sym.signal, color: "var(--series-2)", values: idx("qqq") },
+          { name: sym.long + " buy and hold", short: sym.long, color: "var(--series-3)", values: idx("long_px") },
+        ],
         yFmt: function (v) { return isNum(v) ? "$" + v.toFixed(0) : "—"; },
-        tipFmt: function (v) { return isNum(v) ? "$" + v.toFixed(2) : "—"; } }),
-    ]));
-    let peak = -Infinity;
-    const dd = ser.map(function (p) { if (!isNum(p.equity)) return null; peak = Math.max(peak, p.equity); return p.equity / peak - 1; });
-    sec.append(el("div", null, [
-      el("h3", { text: "Drawdown from peak" }),
-      chart({ label: "Strategy drawdown from its peak", dates: dates, height: 170, zero: true, clampMax: 0,
-        series: [{ name: "Drawdown", color: "var(--series-1)", values: dd, area: true }],
-        refLine: { y: -a.halt_drawdown, label: "Halt at " + pct(-a.halt_drawdown, 0) },
-        yFmt: function (v) { return pct(v, 0); }, tipFmt: function (v) { return pct(v, 1); } }),
-    ]));
-    sec.append(el("div", null, [
-      el("h3", { text: "Net exposure" }),
-      legend([{ name: sym.long + " (long)", color: "var(--long)" }, { name: sym.short + " (short)", color: "var(--short)" }]),
-      chart({ label: "Net exposure by day", dates: dates, height: 150, zero: true, bars: true, posColor: "var(--long)", negColor: "var(--short)",
+        tipFmt: function (v) { return isNum(v) ? "$" + v.toFixed(2) : "—"; } },
+      drawdown: { label: "Strategy drawdown from its peak", dates: dates, height: 170, zero: true, clampMax: 0,
+        series: [{ name: "Drawdown", color: "var(--series-1)", values: ddAll.slice(start), area: true }],
+        refLine: { y: -a.halt_drawdown, label: "Halt " + pct(-a.halt_drawdown, 0) },
+        yFmt: function (v) { return pct(v, 0); }, tipFmt: function (v) { return pct(v, 1); } },
+      exposure: { label: "Net exposure by day", dates: dates, height: 170, zero: true, bars: true, posColor: "var(--long)", negColor: "var(--short)",
         series: [{ name: "Net", color: "var(--axis)", values: ser.map(function (p) { return p.net; }) }],
         yFmt: function (v) { return num(v, 1); }, tipFmt: function (v) { return num(v, 2); },
-        extraTip: function (i) { return [[sym.long, pct(ser[i].w_long, 0)], [sym.short, pct(ser[i].w_short, 0)]]; } }),
-    ]));
-    return sec;
+        extraTip: function (i) { return [[sym.long, pct(ser[i].w_long, 0)], [sym.short, pct(ser[i].w_short, 0)]]; } },
+    };
   }
 
+  function chartCards(a) {
+    const ser = a.series || [], sym = a.symbols;
+    const o = chartOpts(a, 0);
+    const growth = chart(o.growth), dd = chart(o.drawdown), ex = chart(o.exposure);
+    const perf = el("section", { class: "card", "aria-label": "Performance" });
+    const head = el("div", { class: "card-head" }, [el("div", null, [el("h3", { text: "Growth of $100" }), el("div", { class: "card-sub", text: "Strategy against buy and hold over the same days" })])]);
+    // range control: only when there is enough history for it to change anything
+    if (ser.length > 25) {
+      const seg = el("div", { class: "seg", role: "group", "aria-label": "Chart range" });
+      RANGES.forEach(function (r) {
+        const b = el("button", { type: "button", "aria-pressed": r[1] == null ? "true" : "false", text: r[0], "data-range": r[0] });
+        b.addEventListener("click", function () {
+          seg.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+          const next = chartOpts(a, sliceStart(ser, r[1]));
+          growth._opts = next.growth; dd._opts = next.drawdown; ex._opts = next.exposure;
+          [growth, dd, ex].forEach(draw);
+        });
+        seg.append(b);
+      });
+      head.append(seg);
+    }
+    perf.append(head, legend(o.growth.series.map(function (g) { return { name: g.name, color: g.color, line: true }; })), growth);
+    const ddCard = el("section", { class: "card", "aria-label": "Drawdown" }, [
+      el("div", { class: "card-head" }, [el("h3", { text: "Drawdown from peak" })]), dd]);
+    const exCard = el("section", { class: "card", "aria-label": "Net exposure" }, [
+      el("div", { class: "card-head" }, [el("h3", { text: "Net exposure" })]),
+      legend([{ name: sym.long + " (long)", color: "var(--long)" }, { name: sym.short + " (short)", color: "var(--short)" }]), ex]);
+    return el("div", { class: "stack" }, [perf, el("div", { class: "pair" }, [ddCard, exCard])]);
+  }
+
+  // ---- activity: runs / trades / missed days as tabs ----
   function table(headers, rows) {
     const t = el("table");
-    t.append(el("thead", null, [el("tr", null, headers.map(function (h) { return el("th", { class: h[1] || "", text: h[0] }); }))]));
+    t.append(el("thead", null, [el("tr", null, headers.map(function (h) { return el("th", { class: h[1] || null, text: h[0] }); }))]));
     t.append(el("tbody", null, rows.map(function (r) {
-      return el("tr", null, r.map(function (c, i) { return el("td", { class: headers[i][1] || "", text: c }); }));
+      return el("tr", null, r.map(function (c, i) {
+        const td = el("td", { class: headers[i][1] || null });
+        if (c instanceof Node) td.append(c); else td.textContent = c;
+        return td;
+      }));
     })));
     return el("div", { class: "table-wrap" }, [t]);
   }
 
-  function logsSection(a) {
-    const sec = el("div", { class: "section" });
-    const runs = a.runs || [], trades = a.trades || [];
-    sec.append(el("details", null, [
-      el("summary", { text: "Recent runs (" + runs.length + " of " + a.runs_total + ")" }),
-      runs.length ? table([["When", "when"], ["Status"], ["Net", "num"], ["Equity", "num"], ["Orders", "num"], ["Quotes"]],
-        runs.map(function (r) { return [fmtTime(r.ts), String(r.status || "—"), num(r.net, 2), money(r.equity), r.orders ? String(r.orders.length) : "—", r.quote_source ? String(r.quote_source) : "—"]; }))
-        : el("div", { class: "empty", text: "No runs recorded." }),
-    ]));
-    sec.append(el("details", null, [
-      el("summary", { text: "Trades (" + trades.length + " of " + (a.trades_total || 0) + ")" }),
-      trades.length ? table([["When", "when"], ["Side"], ["Qty", "num"], ["Symbol"], ["Type"], ["Ref price", "num"], ["Result"]],
-        trades.map(function (t) { return [fmtTime(t.ts), t.side, t.qty, t.symbol, t.type, money(parseFloat(t.ref_price), 2), t.result]; }))
-        : el("div", { class: "empty", text: "No trades yet." }),
-    ]));
-    if ((a.missed_days || []).length) sec.append(el("details", null, [
-      el("summary", { text: "Trading days with no run (" + a.missed_days.length + ")" }),
-      el("div", { class: "sub", text: a.missed_days.map(fmtDate).join(" · ") }),
-    ]));
-    return sec;
+  const FIRST_ROWS = 10;
+  function limited(rows, render) {
+    // the latest FIRST_ROWS rows, and a button that shows the rest of what the page holds
+    const wrap = el("div");
+    function paint(all) {
+      wrap.replaceChildren(render(all ? rows : rows.slice(0, FIRST_ROWS)));
+      if (!all && rows.length > FIRST_ROWS) {
+        const b = el("button", { type: "button", class: "more", text: "Show all " + rows.length });
+        b.addEventListener("click", function () { paint(true); });
+        wrap.append(b);
+      }
+    }
+    paint(false);
+    return wrap;
   }
 
-  function accountCard(a) {
-    const st = assess(a);
-    const card = el("section", { class: "card account", "data-mode": a.mode, "aria-label": a.name + " account" });
-    card.append(el("div", { class: "card-head" }, [
-      el("span", { class: "name", text: a.name }),
-      el("span", { class: "badge", text: MODE[a.mode] || a.mode }),
-      pill(st.level, st.label),
-    ]));
-    if (st.alerts.length) card.append(el("div", { class: "alerts" }, st.alerts.map(function (al) {
-      return el("div", { class: "alert" }, [statusIcon(al[0]), el("span", { text: al[1] })]);
-    })));
-    const m = a.metrics;
-    if (!a.runs_total) {
-      card.append(el("div", { class: "empty", text: a.mode === "live-disabled"
-        ? "No runs recorded yet. Orders are off for this account until live_trading_enabled is set and the run passes --live."
-        : "No runs recorded yet." }));
-      return card;
+  function activityCard(a) {
+    const runs = a.runs || [], trades = a.trades || [], missed = a.missed_days || [];
+    const card = el("section", { class: "card activity", "aria-label": "Activity" });
+    const tabs = [
+      ["Runs", runs.length + (a.runs_total > runs.length ? " of " + a.runs_total : ""), function () {
+        return runs.length ? limited(runs, function (rows) {
+          return table([["When", "when"], ["Status", "wide"], ["Net", "num opt"], ["Equity", "num"], ["Orders", "num opt"], ["Quotes", "opt"]],
+            rows.map(function (r) {
+              return [fmtTime(r.ts), el("span", { class: "status" }, [statusDot(r.status), el("span", { text: String(r.status || "—") })]),
+                num(r.net, 2), money(r.equity), r.orders ? String(r.orders.length) : "—", r.quote_source ? String(r.quote_source) : "—"];
+            }));
+        })
+          : el("div", { class: "empty", text: "No runs recorded." });
+      }],
+      ["Trades", trades.length + (a.trades_total > trades.length ? " of " + a.trades_total : ""), function () {
+        return trades.length ? limited(trades, function (rows) {
+          return table([["When", "when"], ["Side"], ["Qty", "num"], ["Symbol"], ["Type", "opt"], ["Ref price", "num opt"], ["Result"]],
+            rows.map(function (t) {
+              return [fmtTime(t.ts), el("span", { class: "side " + String(t.side).toLowerCase(), text: t.side }), t.qty, t.symbol, t.type, money(parseFloat(t.ref_price), 2), t.result];
+            }));
+        })
+          : el("div", { class: "empty", text: "No trades yet." });
+      }],
+      ["Missed days", String(missed.length), function () {
+        return missed.length
+          ? el("div", null, [el("div", { class: "card-sub", text: "Trading days since the first run with no run record at all." }),
+            el("div", { class: "missed" }, missed.slice().reverse().map(function (d) { return el("span", { class: "chip", text: fmtDate(d) }); }))])
+          : el("div", { class: "empty", text: "None: every trading day since the first run has a run record." });
+      }],
+    ];
+    const bar = el("div", { class: "seg", role: "tablist", "aria-label": "Activity" });
+    const panel = el("div", { role: "tabpanel" });
+    const buttons = tabs.map(function (t, i) {
+      const b = el("button", { type: "button", role: "tab", "aria-selected": i === 0 ? "true" : "false", text: t[0] + " (" + t[1] + ")" });
+      b.addEventListener("click", function () { select(i); });
+      b.addEventListener("keydown", function (ev) {
+        if (ev.key === "ArrowRight" || ev.key === "ArrowLeft") {
+          const j = (i + (ev.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length;
+          select(j); buttons[j].focus(); ev.preventDefault();
+        }
+      });
+      bar.append(b);
+      return b;
+    });
+    function select(i) {
+      buttons.forEach(function (b, k) { b.setAttribute("aria-selected", k === i ? "true" : "false"); b.tabIndex = k === i ? 0 : -1; });
+      panel.replaceChildren(tabs[i][2]());
     }
-    if (m) {
-      card.append(el("div", { class: "hero" }, [
-        el("span", { class: "value", text: money(m.equity) }),
-        el("span", { class: relClass(m.return), text: pct(m.return, 2, true) + " since " + fmtDate(m.start_date) }),
-      ]));
-      card.append(el("div", { class: "hero-note", text: "Strategy equity, started at " + money(m.start_equity) + " · allotted capital " + money(a.capital) }));
-      const vs = function (b) {
-        if (!isNum(m.return) || !isNum(b)) return null;
-        const d = (m.return - b) * 100;
-        return "Strategy " + (d >= 0 ? "ahead by " : "behind by ") + Math.abs(d).toFixed(1) + " pts";
-      };
-      card.append(el("div", { class: "tiles" }, [
-        tile("Return since start", pct(m.return, 2, true), m.days + " trading days", relClass(m.return)),
-        tile(a.symbols.signal + " buy and hold", pct(m.qqq_return, 2, true), vs(m.qqq_return)),
-        tile(a.symbols.long + " buy and hold", pct(m.long_return, 2, true), vs(m.long_return)),
-        tile("Drawdown now", pct(m.drawdown, 1), "Worst " + pct(m.max_drawdown, 1) + " · halt " + pct(-a.halt_drawdown, 0)),
-        tile("Trades", String(a.trades_total || 0), a.runs_total + " runs recorded"),
-      ]));
-    } else {
-      card.append(el("div", { class: "empty", text: "No run has valued the account yet, so there is no performance to show." }));
-    }
-    card.append(decisionSection(a));
-    if (m) card.append(chartsSection(a));
-    card.append(logsSection(a));
+    card.append(el("div", { class: "card-head" }, [el("h3", { text: "Activity" }), bar]), panel);
+    select(0);
     return card;
   }
 
+  // ---- account detail ----
+  function accountSection(strat, a, st) {
+    const sec = el("section", { class: "account", id: a._id, "data-mode": a.mode, "aria-label": a.name + " account" });
+    const last = a.last_run;
+    sec.append(el("div", { class: "acct-head" }, [
+      el("h2", { text: a.name }),
+      el("span", { class: "badge", text: MODE[a.mode] || a.mode }),
+      pill(st.level, st.label),
+      el("span", { class: "last", text: "Last run " + fmtTime(last && last.ts) }),
+    ]));
+    if (st.alerts.length) sec.append(el("div", { class: "alerts" }, st.alerts.map(function (al) {
+      return el("div", { class: "alert", role: al[0] === "critical" ? "alert" : null }, [statusIcon(al[0]), el("span", { text: al[1] })]);
+    })));
+    if (st.notes.length) sec.append(el("div", { class: "notes", text: st.notes.join(" ") }));
+    if (!a.metrics) {
+      sec.append(el("div", { class: "empty", text: "No run has valued the account yet, so there is no performance to show." }));
+      sec.append(el("div", { class: "grid-main" }, [el("div"), decisionCard(a)]));
+    } else {
+      sec.append(kpis(a));
+      sec.append(el("div", { class: "grid-main" }, [chartCards(a), decisionCard(a)]));
+    }
+    sec.append(activityCard(a));
+    return sec;
+  }
+
   // ---- page ----
-  document.getElementById("generated").textContent = "Updated " + fmtTime(DATA.generated) + " ET";
-  const app = document.getElementById("app"), overall = document.getElementById("overall");
-  DATA.strategies.forEach(function (strat) {
-    const sec = el("section", { class: "strategy" }, [el("h2", { text: strat.name })]);
-    const grid = el("div", { class: "accounts" });
-    strat.accounts.forEach(function (a) {
-      grid.append(accountCard(a));
+  document.getElementById("generated").textContent = "Updated " + fmtTime(DATA.generated) + " ET · rebuilt after the close on weekdays";
+  const stale = staleBanner();
+  if (stale) document.getElementById("stale").append(stale);
+  const app = document.getElementById("app"), overview = document.getElementById("overview");
+  DATA.strategies.forEach(function (strat, si) {
+    const withRuns = [];
+    strat.accounts.forEach(function (a, ai) {
+      a._id = "acct-" + si + "-" + ai;
       const st = assess(a);
-      overall.append(pill(st.level, strat.name + " " + a.name.toLowerCase() + ": " + st.label));
+      overview.append(overviewCard(strat.name, a, st));
+      if (a.runs_total) withRuns.push([a, st]);
     });
-    sec.append(grid);
-    app.append(sec);
+    if (!withRuns.length) return;
+    app.append(el("h2", { class: "strategy-title", text: strat.name }));
+    withRuns.forEach(function (x) { app.append(accountSection(strat.name, x[0], x[1])); });
   });
   CHARTS.forEach(draw);
   let pending = false;
