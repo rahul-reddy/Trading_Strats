@@ -1,5 +1,7 @@
-"""The dashboard in a real browser (Chromium via Playwright): it renders without script errors, shows
-both accounts, draws the charts, answers hover and keyboard focus, fits a phone, and supports dark mode.
+"""The dashboard in a real browser (Chromium via Playwright): it renders without script errors, shows an
+overview of every account and a detail view for each one with runs, keeps bars inside the plot, scopes the
+charts by range, warns when the page is stale, answers hover and keyboard focus, fits a phone, and supports
+dark mode.
 
 Needs `uv run playwright install chromium` once. Locally the tests skip if the browser is missing;
 CI sets DASHBOARD_BROWSER_REQUIRED=1 so they fail instead of skipping."""
@@ -41,28 +43,93 @@ def url(tmp_path_factory):
     return build([str(p) for p in profiles], tmp / "out", now=now).as_uri()
 
 
-def open_page(browser, url, **ctx):
+def open_page(browser, url, now=None, **ctx):
     page = browser.new_page(**ctx)
     errors: list[str] = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+    if now is not None:
+        page.clock.set_fixed_time(pd.Timestamp(now, tz="America/New_York").to_pydatetime())
     page.goto(url)
     return page, errors
 
 
-def test_renders_both_accounts_and_charts(browser, url):
-    page, errors = open_page(browser, url, viewport={"width": 1300, "height": 900})
+def test_overview_and_detail(browser, url):
+    page, errors = open_page(browser, url, now="2026-10-20 18:00", viewport={"width": 1300, "height": 900})
     assert errors == []
-    cards = page.locator(".account")
-    assert cards.count() == 2
-    paper, live = cards.nth(0), cards.nth(1)
-    assert paper.locator(".hero .value").inner_text().startswith("$")
+    overview = page.locator(".ov")
+    assert overview.count() == 2  # every account, with or without runs
+    assert overview.nth(0).locator(".ov-value").inner_text().startswith("$")
+    assert "No runs yet" in overview.nth(1).inner_text()
+    assert "dry run" in overview.nth(1).locator(".badge").inner_text()
+    detail = page.locator(".account")
+    assert detail.count() == 1  # an account without runs gets no empty detail section
+    paper = detail.first
+    assert paper.locator(".kpi.hero .v").inner_text().startswith("$")
     assert paper.locator(".chart svg").count() == 3
     assert paper.locator(".chart svg path").count() > 3
     assert "with no run" in paper.locator(".alerts").inner_text()  # the fixture skips a trading day
-    assert "No runs recorded yet" in live.inner_text()
-    assert "orders off" in live.locator(".badge").inner_text()
+    assert "Target:" in paper.locator(".decision").inner_text()
     assert "DU1234567" not in page.content()
+    page.close()
+
+
+def test_exposure_bars_stay_inside_the_plot(browser, url):
+    page, errors = open_page(browser, url, viewport={"width": 1300, "height": 900})
+    svg = page.locator(".account .chart svg").nth(2)  # growth, drawdown, exposure
+    bounds = svg.evaluate(
+        """s => {
+          const lines = [...s.querySelectorAll('.grid line')];
+          const left = +lines[0].getAttribute('x1'), right = +lines[0].getAttribute('x2');
+          const bars = [...s.querySelectorAll('path')].filter(p => (p.getAttribute('fill') || '').includes('--long')
+            || (p.getAttribute('fill') || '').includes('--short'));
+          return { left, right, n: bars.length, min: Math.min(...bars.map(b => b.getBBox().x)),
+                   max: Math.max(...bars.map(b => b.getBBox().x + b.getBBox().width)) };
+        }"""
+    )
+    assert bounds["n"] > 10
+    assert bounds["min"] >= bounds["left"] and bounds["max"] <= bounds["right"]
+    assert errors == []
+    page.close()
+
+
+def test_range_buttons_scope_the_charts(browser, url):
+    page, errors = open_page(browser, url, viewport={"width": 1300, "height": 900})
+    growth = page.locator(".account .chart svg").first
+    # x-axis date labels are the last five texts in the axis group
+    dates = lambda: growth.evaluate("s => [...s.querySelectorAll('.axis text')].slice(-5).map(t => t.textContent)")  # noqa: E731
+    before = dates()
+    assert before[0] == "Aug 3"
+    page.get_by_role("button", name="1M").click()
+    assert page.get_by_role("button", name="1M").get_attribute("aria-pressed") == "true"
+    after = dates()
+    assert after[0] != "Aug 3" and after[-1] == "Oct 20"  # starts later, still ends on the latest day
+    assert errors == []
+    page.close()
+
+
+def test_stale_page_banner(browser, url):
+    fresh, errors = open_page(browser, url, now="2026-10-20 18:00", viewport={"width": 1300, "height": 900})
+    assert fresh.locator("#stale .banner").count() == 0
+    fresh.close()
+    stale, errors2 = open_page(browser, url, now="2026-10-22 18:00", viewport={"width": 1300, "height": 900})
+    assert "last rebuilt on Oct 20, 2026" in stale.locator("#stale .banner").inner_text()
+    assert errors == [] and errors2 == []
+    stale.close()
+
+
+def test_activity_tabs_and_show_all(browser, url):
+    page, errors = open_page(browser, url, viewport={"width": 1300, "height": 900})
+    act = page.locator(".activity")
+    assert act.locator("tbody tr").count() == 10
+    act.get_by_role("button", name="Show all 30").click()
+    assert act.locator("tbody tr").count() == 30
+    act.get_by_role("tab", name="Trades (31)").click()
+    assert act.get_by_role("tab", name="Trades (31)").get_attribute("aria-selected") == "true"
+    assert "Side" in act.locator("thead").inner_text()
+    act.get_by_role("tab", name="Missed days (1)").click()
+    assert "Sep 22, 2026" in act.inner_text()
+    assert errors == []
     page.close()
 
 
@@ -90,6 +157,8 @@ def test_fits_a_phone_without_sideways_scroll(browser, url):
     assert svg_width <= 375
     # charts draw at their real width, so axis text stays readable instead of scaling down
     assert page.locator(".account .chart svg").first.get_attribute("viewBox").split()[2] == str(round(svg_width))
+    table = page.locator(".activity .table-wrap").first
+    assert table.evaluate("e => e.scrollWidth <= e.clientWidth")  # the run table fits without scrolling
     assert errors == []
     page.close()
 
@@ -99,6 +168,6 @@ def test_dark_mode_and_theme_toggle(browser, url):
     bg = page.evaluate("getComputedStyle(document.body).backgroundColor")
     assert bg == "rgb(13, 13, 13)"
     page.locator("#theme").click()  # auto -> light
-    assert page.evaluate("getComputedStyle(document.body).backgroundColor") == "rgb(249, 249, 247)"
+    assert page.evaluate("getComputedStyle(document.body).backgroundColor") == "rgb(246, 245, 241)"
     assert errors == []
     page.close()
