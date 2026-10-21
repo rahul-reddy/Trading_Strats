@@ -32,7 +32,10 @@ SHORT=${SHA:0:7}
 # The bundle is the committed tqqq-blend tree at $SHA: local edits, untracked files and the
 # checked-out branch cannot change it. git archive runs from the repository root: from this
 # subfolder it would silently filter the tree down to an empty archive.
-archive() { (cd "$(git rev-parse --show-toplevel)" && git archive --format=tar.gz "$SHA:tqqq-blend"); }
+# Line-ending conversion is off: archiving the tqqq-blend subtree loses the root .gitattributes
+# (which keep *.sh LF), so core.autocrlf=true on Windows wrote CRLF into every script and bash
+# on the server failed on `set -o pipefail\r`. The bundle is the committed bytes, which are LF.
+archive() { (cd "$(git rev-parse --show-toplevel)" && git -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz "$SHA:tqqq-blend"); }
 if [ -n "$BUNDLE_ONLY" ]; then
   archive > "$BUNDLE_ONLY"
   exit 0

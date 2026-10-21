@@ -33,7 +33,7 @@ def repo(tmp_path: Path) -> Path:
     git(tmp_path, "clone", str(origin), str(work))
     (work / "tqqq-blend" / "deploy").mkdir(parents=True)
     (work / "tqqq-blend" / "deploy" / "push.sh").write_bytes(PUSH_SH.read_bytes())
-    (work / "tqqq-blend" / "config.toml").write_text("capital = 1\n")
+    (work / "tqqq-blend" / "config.toml").write_bytes(b"capital = 1\n")  # exact bytes: write_text adds CR on Windows
     git(work, "add", "-A")
     git(work, "commit", "-m", "merged")
     git(work, "push", "-q", "origin", "HEAD:main")
@@ -55,8 +55,7 @@ def test_bundle_is_the_commit_not_the_working_tree(repo: Path, tmp_path: Path):
     assert result.returncode == 0, result.stderr
     with tarfile.open(out) as tar:
         names = set(tar.getnames())
-        committed = tar.extractfile("config.toml").read().replace(b"\r\n", b"\n")  # autocrlf may add CR
-        assert committed == b"capital = 1\n"
+        assert tar.extractfile("config.toml").read() == b"capital = 1\n"
     assert "untracked.py" not in names and "deploy/push.sh" in names
 
 
@@ -69,3 +68,21 @@ def test_commit_not_on_main_is_refused(repo: Path, tmp_path: Path):
     assert result.returncode != 0
     assert "not on origin/main" in result.stdout
     assert not out.exists()
+
+
+def test_bundle_keeps_lf_even_with_autocrlf(repo: Path, tmp_path: Path):
+    # Windows checkouts default to core.autocrlf=true, and the archived subtree doesn't see the root
+    # .gitattributes. A CR in a shell script breaks it on the server (`set: pipefail: invalid option`).
+    (repo / "tqqq-blend" / "deploy" / "server").mkdir()
+    (repo / "tqqq-blend" / "deploy" / "server" / "install.sh").write_bytes(b"#!/usr/bin/env bash\nset -euo pipefail\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "script")
+    git(repo, "push", "-q", "origin", "HEAD:main")
+    subprocess.run(["git", "config", "core.autocrlf", "true"], cwd=repo, check=True)
+    out = tmp_path / "bundle.tgz"
+    result = bundle(repo, "origin/main", out)
+    assert result.returncode == 0, result.stderr
+    with tarfile.open(out) as tar:
+        for member in tar.getmembers():
+            if member.isfile():
+                assert b"\r" not in tar.extractfile(member).read(), f"CR in {member.name}"
