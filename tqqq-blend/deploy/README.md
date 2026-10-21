@@ -43,6 +43,7 @@ deploy/
   aws/stack.yml                 instance, IAM role, security group, S3 bucket (releases + state backups),
                                 Amplify app + generated login for the dashboard
   aws/deploy-user-policy.json   permissions for the trading-deploy IAM user that runs everything below
+                                (a managed policy: it is over IAM's 2,048-character limit for inline user policies)
   Dockerfile, docker-compose.yml
   push.sh                       merged commit -> git archive -> S3 -> SSM Run Command -> server/install.sh
   server/install.sh             installs Docker, pulls secrets from SSM, starts gateways, enables timers
@@ -64,8 +65,9 @@ paths like `/trading/...` into Windows paths.
 
 ```bash
 aws iam create-user --user-name trading-deploy
-aws iam put-user-policy --user-name trading-deploy --policy-name trading-deploy \
-  --policy-document file://deploy/aws/deploy-user-policy.json
+ACCT=$(aws sts get-caller-identity --query Account --output text)
+aws iam create-policy --policy-name trading-deploy --policy-document file://deploy/aws/deploy-user-policy.json
+aws iam attach-user-policy --user-name trading-deploy --policy-arn "arn:aws:iam::$ACCT:policy/trading-deploy"
 aws iam create-access-key --user-name trading-deploy       # paste the keys into the next command
 aws configure --profile trading-deploy                      # region us-east-1
 export AWS_PROFILE=trading-deploy
@@ -154,7 +156,12 @@ in your password manager or browser; nobody else gets them.
 **Setting it up** (once, after this change is merged):
 
 1. Update the deploy user's permissions (Amplify and the dashboard secret), with your admin credentials:
-   `aws iam put-user-policy --user-name trading-deploy --policy-name trading-deploy --policy-document file://deploy/aws/deploy-user-policy.json`
+   the policy is a managed one, so a change is a new default version (IAM keeps at most five; delete the oldest
+   first if it refuses):
+   `aws iam create-policy-version --policy-arn arn:aws:iam::<account>:policy/trading-deploy --policy-document file://deploy/aws/deploy-user-policy.json --set-as-default`.
+   A deploy user still on the old inline policy gets `LimitExceeded` (IAM's 2,048-character limit for inline user
+   policies). Move it with `create-policy` and `attach-user-policy` as in First-time setup, then
+   `aws iam delete-user-policy --user-name trading-deploy --policy-name trading-deploy`.
 2. Update the stack: `aws cloudformation deploy --stack-name tqqq-trading --template-file deploy/aws/stack.yml --capabilities CAPABILITY_IAM`
 3. Run `deploy/push.sh`. It hands the app ID to the server, which turns on `trading-dashboard.timer`.
    To publish right away instead of at 16:35, push with `KEEP_RUNNING=1` and run
