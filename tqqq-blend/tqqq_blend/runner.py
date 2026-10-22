@@ -22,6 +22,7 @@ import pandas_market_calendars as mcal
 from .brokers import Order, make_broker
 from .config import Config
 from .data import live_signal_bars
+from .explain import explain
 from .quotes import get_prices
 from .strategy import compute_signals
 
@@ -139,6 +140,12 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
                 "w_short": last["w_short"],
             }
         )
+        # Plain-language reasons for the dashboard. Informational only: a failure here is recorded and
+        # must never stop or change the run, so it can't be what decides whether an order goes out.
+        try:
+            rec["why"] = explain(sig, s)
+        except Exception as e:  # noqa: BLE001
+            rec["why_error"] = f"{type(e).__name__}: {e}"
 
         # ---- risk checks ----
         today = pd.Timestamp.now(tz="America/New_York").tz_localize(None).normalize()
