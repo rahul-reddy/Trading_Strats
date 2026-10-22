@@ -118,6 +118,23 @@ def _return(series: list[dict], key: str) -> float | None:
     return vals[-1] / vals[0] - 1 if len(vals) >= 2 and vals[0] else None
 
 
+def trade_reason(trade: dict, by_ts: dict[str, dict]) -> dict:
+    """The trade plus why its run wanted that exposure: each sleeve's rule and the resulting target.
+    Runs from before reasons were recorded give only the target; the page says so."""
+    run = by_ts.get(trade.get("ts", ""))
+    if run is None:
+        return trade
+    why = run.get("why") or {}
+    return trade | {
+        "why": {
+            "rules": [f"{s['name']}: {s['rule']}" for s in why.get("sleeves", [])],
+            "net": _num(run.get("net")),
+            "w_long": _num(run.get("w_long")),
+            "w_short": _num(run.get("w_short")),
+        }
+    }
+
+
 def summarize_profile(cfg: Config, now: pd.Timestamp) -> dict:
     """Everything the page shows for one account profile."""
     state_dir = Path(cfg.state_dir)
@@ -131,6 +148,7 @@ def summarize_profile(cfg: Config, now: pd.Timestamp) -> dict:
         "mode": "paper" if paper else ("live" if b.live_trading_enabled else "live-disabled"),
         "capital": cfg.risk.capital,
         "halt_drawdown": cfg.risk.max_drawdown_halt,
+        "rebalance_band": s.rebalance_band,
         "symbols": {"signal": s.signal_symbol, "long": s.long_symbol, "short": s.short_symbol},
         "kill_switch": (state_dir / "STOP").exists(),
         "halted": state.get("halted"),
@@ -179,6 +197,7 @@ def summarize_profile(cfg: Config, now: pd.Timestamp) -> dict:
     decision = next((r for r in reversed(runs) if _num(r.get("net")) is not None), None)
     recent_cutoff = str((now - pd.Timedelta(days=30)).date())
     trades = read_trades(state_dir)
+    by_ts = {r["ts"]: r for r in runs}  # a trade carries its run's timestamp
     account |= {
         "series": series,
         "metrics": metrics,
@@ -188,7 +207,7 @@ def summarize_profile(cfg: Config, now: pd.Timestamp) -> dict:
         "missed_days": missed_days(run_dates, min(run_dates), due_through(now)),
         "errors_30d": sum(1 for r in runs if str(r.get("status", "")).startswith("error") and r["ts"] >= recent_cutoff),
         "runs": list(reversed(runs[-RECENT_RUNS:])),
-        "trades": list(reversed(trades[-RECENT_TRADES:])),
+        "trades": [trade_reason(t, by_ts) for t in reversed(trades[-RECENT_TRADES:])],
         "trades_total": len(trades),
     }
     return scrub(account)

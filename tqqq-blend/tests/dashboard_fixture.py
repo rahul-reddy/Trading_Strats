@@ -12,6 +12,44 @@ import pandas as pd
 import pandas_market_calendars as mcal
 
 ROOT = Path(__file__).resolve().parents[1]
+WHY_FROM = "2026-10-01"
+
+
+def fake_why(net: float) -> dict:
+    """A recorded explanation shaped like explain.explain() output (the wording is illustrative)."""
+    trend = 1.0 if net > 0 else 0.0
+    return {
+        "version": 1,
+        "sleeves": [
+            {
+                "key": "trend",
+                "name": "Trend",
+                "value": trend,
+                "weight": 1 / 3,
+                "rule": "Uptrend: long 100%" if trend else "Downtrend: no position",
+                "detail": "QQQ is in an uptrend: above its 250-day average.",
+            },
+            {
+                "key": "mr",
+                "name": "Mean reversion",
+                "value": 0.0,
+                "weight": 1 / 3,
+                "rule": "No setup",
+                "detail": "RSI(2) is 48; it buys when RSI(2) drops below 10 while QQQ is in an uptrend.",
+            },
+            {
+                "key": "vibha",
+                "name": "Market timing",
+                "value": 0.5,
+                "weight": 1 / 3,
+                "rule": "Holding 50%",
+                "detail": "No new signal today; the position is unchanged since the retook the 50-day on Sep 30.",
+                "flags": [],
+            },
+        ],
+        "blend": [f"Weighted sleeves: ... = {net:+.2f}", "Volatility target: QQQ volatility is under 20%, no scaling"],
+        "net": net,
+    }
 
 
 def trading_days(start: str, end: str) -> list[pd.Timestamp]:
@@ -89,8 +127,11 @@ def write_state(
                         "result": "Filled",
                     }
                 )
+        # runs from WHY_FROM on carry recorded reasons; earlier ones predate them
+        extra = {"why": fake_why(round(net, 3))} if d >= WHY_FROM else {}
         runs.append(
-            {
+            extra
+            | {
                 "ts": ts,
                 "broker": "ibkr",
                 "live": True,

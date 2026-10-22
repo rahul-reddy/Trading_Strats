@@ -177,6 +177,16 @@ a.ov:hover { border-color: var(--axis); transform: translateY(-1px); }
 .side { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 6px; background: var(--surface-2); }
 .side.buy { color: var(--up); }
 .side.sell { color: var(--down); }
+.order { display: grid; gap: 4px; }
+.order-line { display: flex; align-items: center; gap: 8px; }
+.order-why { color: var(--ink-2); font-size: 13px; line-height: 1.45; }
+.rule-block { padding: 10px 0; border-top: 1px solid var(--border); }
+.rule-block:first-of-type { border-top: 0; padding-top: 0; }
+.rule-title { font-weight: 650; font-size: 14px; margin-top: 6px; }
+.rule-detail { color: var(--ink-2); font-size: 13px; line-height: 1.5; margin-top: 2px; }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.note-old { margin-top: 10px; }
+td.why { color: var(--ink-2); font-size: 12.5px; min-width: 220px; }
 .section-label { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; margin: 18px 0 8px; }
 .signals { display: grid; grid-template-columns: auto minmax(80px, 1fr) auto; gap: 8px 12px; align-items: center; font-size: 13.5px; }
 .signals .name { color: var(--ink-2); white-space: nowrap; }
@@ -725,26 +735,57 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
 
     const orders = d.orders || [];
     const failed = d.status && String(d.status).startsWith("error");
-    card.append(el("ul", { class: "orders", "aria-label": "Orders" }, orders.length
-      ? orders.map(function (o) {
-        return el("li", null, [
+    const sizing = orderReasons(a, d);
+    const reasonFor = function (symbol) {
+      const r = sizing.find(function (x) { return x.symbol === symbol; });
+      return r ? r.text : null;
+    };
+    card.append(el("div", { class: "section-label", text: "What it did" }));
+    const list = el("ul", { class: "orders", "aria-label": "Orders" });
+    orders.forEach(function (o) {
+      list.append(el("li", { class: "order" }, [
+        el("div", { class: "order-line" }, [
           el("span", { class: "side " + String(o.side).toLowerCase(), text: o.side }),
           el("span", { text: o.quantity + " " + o.symbol }),
           el("span", { class: "card-sub", text: o.order_type === "MOC" ? "market on close" : String(o.order_type || "").toLowerCase() }),
-        ]);
-      })
-      : [el("li", { class: "card-sub", text: failed ? "No orders: the run stopped before trading." : "No orders: already within the rebalance band." })]));
+        ]),
+        reasonFor(o.symbol) ? el("div", { class: "order-why", text: reasonFor(o.symbol) }) : null,
+      ]));
+    });
+    if (!orders.length) {
+      if (failed) list.append(el("li", { class: "card-sub", text: "No orders: the run stopped before trading." }));
+      else if (sizing.length) sizing.forEach(function (r) { list.append(el("li", { class: "order-why", text: r.text })); });
+      else list.append(el("li", { class: "card-sub", text: "No orders: already within the rebalance band." }));
+    }
+    card.append(list);
 
     card.append(el("div", { class: "section-label", text: "Why" }));
-    const sig = el("div", { class: "signals" });
-    [
-      signalRow("Net exposure", d.net, true),
-      signalRow("Trend", d.trend),
-      signalRow("Mean reversion", d.mr),
-      signalRow("Market timing", d.vibha),
-      signalRow("Volatility scale", d.vol_scale, false, true),
-    ].forEach(function (r) { r.forEach(function (c) { sig.append(c); }); });
-    card.append(sig);
+    if (d.why && d.why.sleeves) {
+      d.why.sleeves.forEach(function (s) {
+        const head = el("div", { class: "signals" });
+        signalRow(s.name, s.value, true).forEach(function (c) { head.append(c); });
+        card.append(el("div", { class: "rule-block" }, [
+          head,
+          el("div", { class: "rule-title", text: s.rule }),
+          s.detail ? el("div", { class: "rule-detail", text: s.detail }) : null,
+        ]));
+      });
+      card.append(el("div", { class: "section-label", text: "How it adds up" }));
+      card.append(el("ol", { class: "steps" }, (d.why.blend || []).map(function (t) { return el("li", { text: t }); })));
+    } else {
+      const sig = el("div", { class: "signals" });
+      [
+        signalRow("Net exposure", d.net, true),
+        signalRow("Trend", d.trend),
+        signalRow("Mean reversion", d.mr),
+        signalRow("Market timing", d.vibha),
+        signalRow("Volatility scale", d.vol_scale, false, true),
+      ].forEach(function (r) { r.forEach(function (c) { sig.append(c); }); });
+      card.append(sig);
+      card.append(el("div", { class: "card-sub note-old", text: d.why_error
+        ? "The rule-by-rule reasons could not be worked out for this run (" + d.why_error + "); the sleeve values above are what it decided on."
+        : "This run is from before rule-by-rule reasons were recorded; the sleeve values above are what it decided on." }));
+    }
 
     card.append(el("div", { class: "section-label", text: "Market flags" }));
     card.append(el("div", { class: "chips" }, [
@@ -757,6 +798,30 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
       el("span", { text: "Quotes: " + (d.quote_source === "finviz" ? "Finviz, real time" : d.quote_source ? String(d.quote_source).toUpperCase() + ", may be delayed" : "—") }),
     ]));
     return card;
+  }
+
+  // Why each symbol was or wasn't traded: runner.plan_orders skips a change of weight inside the rebalance
+  // band unless it moves a position to or from zero. Uses what the run recorded (positions before its
+  // orders, its prices and the capital it sized with).
+  function orderReasons(a, d) {
+    const cap = d.capital, pos = d.positions || {}, px = d.prices || {}, band = a.rebalance_band;
+    if (!isNum(cap) || cap <= 0 || !isNum(band)) return [];
+    const out = [];
+    [[a.symbols.long, d.w_long], [a.symbols.short, d.w_short]].forEach(function (p) {
+      const sym = p[0], target = isNum(p[1]) ? p[1] : 0, shares = pos[sym] || 0, price = px[sym];
+      if (!isNum(price)) return;
+      const held = (shares * price) / cap;
+      if (!shares && !target) return;
+      const pts = Math.abs(target - held) * 100, bandPts = band * 100;
+      const toFromZero = (target === 0) !== (shares === 0);
+      const base = sym + ": held " + pct(held, 0) + ", target " + pct(target, 0);
+      let text;
+      if (pts / 100 <= band && !toFromZero) text = base + ". A " + pts.toFixed(0) + "-point change is inside the " + bandPts.toFixed(0) + "-point rebalance band, so no trade.";
+      else if (toFromZero) text = base + (target === 0 ? ". The target is zero, so the position is closed." : ". Opening a new position.");
+      else text = base + ". A " + pts.toFixed(0) + "-point change, beyond the " + bandPts.toFixed(0) + "-point rebalance band, so it trades.";
+      out.push({ symbol: sym, text: text });
+    });
+    return out;
   }
 
   function statusDot(status) {
@@ -853,6 +918,15 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
     return el("div", { class: "table-wrap" }, [t]);
   }
 
+  function tradeWhy(t, a) {
+    const w = t.why;
+    if (!w) return "—";
+    const target = isNum(w.w_long) && w.w_long > 0 ? pct(w.w_long, 0) + " " + a.symbols.long
+      : isNum(w.w_short) && w.w_short > 0 ? pct(w.w_short, 0) + " " + a.symbols.short : "all cash";
+    const head = "Target " + target + (isNum(w.net) ? " (net " + num(w.net, 2) + ")" : "");
+    return w.rules && w.rules.length ? head + ". " + w.rules.join(" · ") : head + ". Recorded before rule-by-rule reasons.";
+  }
+
   const FIRST_ROWS = 10;
   function limited(rows, render) {
     // the latest FIRST_ROWS rows, and a button that shows the rest of what the page holds
@@ -885,9 +959,10 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
       }],
       ["Trades", trades.length + (a.trades_total > trades.length ? " of " + a.trades_total : ""), function () {
         return trades.length ? limited(trades, function (rows) {
-          return table([["When", "when"], ["Side"], ["Qty", "num"], ["Symbol"], ["Type", "opt"], ["Ref price", "num opt"], ["Result"]],
+          return table([["When", "when"], ["Side"], ["Qty", "num"], ["Symbol"], ["Type", "opt"], ["Ref price", "num opt"], ["Result", "opt"], ["Why", "why opt"]],
             rows.map(function (t) {
-              return [fmtTime(t.ts), el("span", { class: "side " + String(t.side).toLowerCase(), text: t.side }), t.qty, t.symbol, t.type, money(parseFloat(t.ref_price), 2), t.result];
+              return [fmtTime(t.ts), el("span", { class: "side " + String(t.side).toLowerCase(), text: t.side }), t.qty, t.symbol, t.type,
+                money(parseFloat(t.ref_price), 2), t.result, tradeWhy(t, a)];
             }));
         })
           : el("div", { class: "empty", text: "No trades yet." });

@@ -133,3 +133,17 @@ def test_zero_or_negative_equity_does_not_crash_the_build(tmp_path):
     m = page_data(html.read_text(encoding="utf-8"))["strategies"][0]["accounts"][0]["metrics"]
     assert m["return"] is None  # no ratio from a zero starting equity
     assert m["max_drawdown"] == 0.0
+
+
+def test_trades_carry_their_runs_reasons(built):
+    _, _, data = built
+    paper = data["strategies"][0]["accounts"][0]
+    assert paper["rebalance_band"] == pytest.approx(0.10)
+    recent = [t for t in paper["trades"] if t["ts"] >= "2026-10-01"]
+    older = [t for t in paper["trades"] if t["ts"] < "2026-10-01"]
+    assert recent and older
+    for t in recent:  # runs from 2026-10-01 on recorded "why"
+        assert t["why"]["rules"][0].startswith("Trend: ")
+        assert t["why"]["net"] == pytest.approx(float(t["net_signal"]), abs=1e-3)
+    for t in older:  # earlier runs predate it: the target is still known, the rules are not
+        assert t["why"]["rules"] == [] and t["why"]["net"] is not None

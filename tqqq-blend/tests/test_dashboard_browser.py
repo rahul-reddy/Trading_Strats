@@ -181,3 +181,18 @@ def test_values_that_round_to_zero_have_no_sign(browser, url):
     assert "−0.00" not in act.inner_text() and "−0.0%" not in page.locator("main").inner_text()
     assert errors == []
     page.close()
+
+
+def test_decision_explains_the_rules_and_the_orders(browser, url):
+    page, errors = open_page(browser, url, viewport={"width": 1300, "height": 900})
+    decision = page.locator(".decision")
+    text = decision.inner_text()
+    assert "WHAT IT DID" in text.upper() and "rebalance band" in text  # why it did or didn't trade
+    assert decision.locator(".rule-title").count() == 3  # one rule per sleeve
+    assert "HOW IT ADDS UP" in text.upper()
+    act = page.locator(".activity")
+    act.get_by_role("tab", name="Trades (31)").click()
+    assert "Trend: " in act.inner_text()  # a recent trade's reasons
+    assert "Recorded before rule-by-rule reasons" in act.inner_text()  # an older one says so
+    assert errors == []
+    page.close()
