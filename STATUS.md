@@ -1,16 +1,18 @@
 # Status
 
-## Current handoff (2026-10-21)
+## Current handoff (2026-10-22)
 
-**Revision:** the server runs `19de244` (main), deployed 2026-10-21 through deploy/push.sh, the first deploy
-that way. The dashboard is live behind basic auth (stack output `DashboardUrl`; login in Secrets Manager
-`tqqq-trading-dashboard`) and republishes at 16:35 ET on weekdays.
+**Revision:** the server runs `41f8d47` (main), deployed 2026-10-22 08:11 ET through deploy/push.sh. The dashboard
+(redesign #16, trade reasons #17, layout fix #18) is live behind basic auth (stack output `DashboardUrl`; login
+in Secrets Manager `tqqq-trading-dashboard`) and republishes at 16:35 ET on weekdays. From the 2026-10-22 run on,
+each run records `why` (explain.py): each sleeve's rule and the blend to the target.
 
-**Verified on 19de244 (local, Windows, and CI on the PR heads):**
-- `pwsh -NoProfile -File scripts/cross-review-selftest.ps1` and `validate_skills.py`: passed
-- tqqq-blend: `ruff check`, `ruff format --check`, `mypy`: clean; `pytest`: 31 passed, including 4
-  Chromium dashboard tests and the push bundle tests (exact commit, LF even with autocrlf)
-- On AWS: push.sh deploy succeeded; first dashboard publish succeeded; 401 without the password
+**Verified on 41f8d47 (local, Windows, and CI on the PR heads):**
+- `pwsh -NoProfile -File scripts/cross-review-selftest.ps1`: passed
+- tqqq-blend: `ruff check`, `ruff format --check`, `mypy`: clean; `pytest`: 46 passed, including 13 Chromium
+  dashboard tests; the explained blend reproduces the recorded net on every day of three synthetic markets
+- On AWS: explain ran in the server container on live QQQ data and matched the Oct 21 decision; the dashboard
+  published, answers 401 without the password and renders with it
 
 **Running:** tqqq-blend on AWS, the IBKR paper profile (config.aws-paper.toml), $100k strategy capital, Finviz
 quotes. Paper has run 2026-10-20 and 2026-10-21 (3 trades). The live profile has no login on the server yet.
@@ -21,12 +23,18 @@ quotes. Paper has run 2026-10-20 and 2026-10-21 (3 trades). The live profile has
   drawdown halt, max_order_value) and for the IBKR account-type check.
 - Live: store the new IBKR live user's login once IBKR approves it, deploy, approve the push,
   run ibkr-check. Confirm whether the gateway resends a missed 2FA push.
-- Dashboard: the net-exposure bars at the first and last day overlap the plot edge (cosmetic).
 
-**Next action:** after the 2026-10-22 close, confirm the 16:35 timer republished the dashboard on its own
-(`journalctl -u trading-dashboard`).
+**Next action:** after the 2026-10-22 close, confirm the 16:35 timer republished the dashboard on its own and that
+the 15:30 run recorded `why` (the decision card shows rule-by-rule reasons instead of the "before reasons" note).
 
 ## History
+
+- 2026-10-22: Trade reasons (#17): explain.py turns a day's signal into each sleeve's rule plus the blend
+  arithmetic; the runner records it (fenced: a failure can't change a run); the dashboard shows what it did
+  (held vs target against the rebalance band), why, and how it adds up, and a Why column for trades. Strategy
+  logic unchanged. Dashboard redesign (#16): overview row, KPI row with drawdown meter, range buttons, plain-
+  language decision, activity tabs, stale-page banner, exposure bars inside the plot. Order layout fix (#18).
+  Deployed 41f8d47.
 
 - 2026-10-21: Deployed. The deploy user's permissions became a managed policy (inline policies are capped at
   2,048 characters; #13). Stack update added the Amplify app, branch and secret (no replacements). The first
