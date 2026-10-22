@@ -196,3 +196,18 @@ def test_decision_explains_the_rules_and_the_orders(browser, url):
     assert "Recorded before rule-by-rule reasons" in act.inner_text()  # an older one says so
     assert errors == []
     page.close()
+
+
+def test_order_reason_sits_under_its_order(browser, tmp_path):
+    # The fixture's run on 2026-10-16 placed an order, so a page built that evening has one to explain.
+    write_state(tmp_path / "paper", end="2026-10-16")
+    profile = write_profile(tmp_path / "paper.toml", "config.ibkr-paper.toml", tmp_path / "paper")
+    page_url = build([str(profile)], tmp_path / "out", now=pd.Timestamp("2026-10-16 17:00", tz="America/New_York"))
+    page, errors = open_page(browser, page_url.as_uri(), viewport={"width": 1300, "height": 900})
+    order = page.locator(".decision li.order").first
+    assert "rebalance band" in order.locator(".order-why").inner_text()
+    line = order.locator(".order-line").bounding_box()
+    why = order.locator(".order-why").bounding_box()
+    assert why["y"] >= line["y"] + line["height"] - 1  # below its order line, not squeezed beside it
+    assert errors == []
+    page.close()
