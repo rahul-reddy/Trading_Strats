@@ -274,3 +274,11 @@ def test_a_failed_run_with_working_orders_is_not_repeated(tmp_path, market, monk
         rec = runner.run_once(cfg, live=True, force=force)
         assert rec["status"] == "skipped: orders placed today are still waiting for fills"
     assert len(market["account"].queued) == 1
+
+
+def test_state_is_saved_atomically(tmp_path):
+    store = runner.StateStore(str(tmp_path / "b"))
+    store.data["positions"] = {"TQQQ": 1}
+    store.save()
+    assert json.loads((tmp_path / "b" / "state.json").read_text())["positions"] == {"TQQQ": 1}
+    assert not list((tmp_path / "b").glob("*.tmp"))

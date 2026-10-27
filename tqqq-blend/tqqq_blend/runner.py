@@ -79,7 +79,11 @@ class StateStore:
         self.data = json.loads(self.path.read_text()) if self.path.exists() else {}
 
     def save(self):
-        self.path.write_text(json.dumps(self.data, indent=2, default=str))
+        # Atomic: other buckets on the account read this file (ledger.check_account) while this one runs,
+        # and a half-written file would stop their runs.
+        tmp = self.path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(self.data, indent=2, default=str))
+        tmp.replace(self.path)
 
     def append_run(self, rec: dict):
         with open(self.dir / "runs.jsonl", "a") as f:
