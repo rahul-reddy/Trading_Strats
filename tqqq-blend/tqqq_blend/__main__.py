@@ -112,7 +112,10 @@ def main():
     elif args.cmd == "reconcile":
         from .runner import reconcile
 
-        print(json.dumps(reconcile(cfg), indent=2, default=str))
+        rec = reconcile(cfg)
+        print(json.dumps(rec, indent=2, default=str))
+        if str(rec.get("status", "")).startswith("error"):
+            raise SystemExit(1)  # so deploy/server/reconcile.sh, and the systemd unit, show the failure
 
     elif args.cmd == "ibkr-check":
         from .brokers.ibkr import IBKRBroker

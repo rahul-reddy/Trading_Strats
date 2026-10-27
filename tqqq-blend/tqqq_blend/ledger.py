@@ -107,11 +107,14 @@ def check_account(
     broker_positions: dict[str, int],
     symbols: set[str],
     mine: dict,
+    today: date,
     mode: str = "exact",
 ) -> None:
     """Stop unless, for every symbol any bucket on the account holds or this bucket may trade, the account's
     position equals the sum of the buckets' ledgers, up to orders placed today that may already have filled.
-    mode "at_least" only requires the account to hold at least that much (the owner's own shares on top).
+    An order from an earlier day that is still pending widens nothing: its fills are unknown, so a difference
+    it might explain stops the run. mode "at_least" only requires the account to hold at least that much
+    (the owner's own shares on top).
 
     `mine` is this bucket's in-memory state (it may be newer than its file). Raises LedgerError."""
     if mode not in ("exact", "at_least"):
@@ -128,6 +131,8 @@ def check_account(
         for sym, qty in positions(d).items():
             held[sym] = held.get(sym, 0) + qty
         for p in d.get("pending_orders", []):
+            if p["date"] != str(today):
+                continue
             q = p["qty"] if p["side"] == "BUY" else -p["qty"]
             (high if q > 0 else low)[p["symbol"]] = (high if q > 0 else low).get(p["symbol"], 0) + q
     problems = []

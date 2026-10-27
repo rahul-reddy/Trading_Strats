@@ -266,7 +266,7 @@ def bucket_positions(cfg: Config, store: StateStore, broker, symbols: set[str], 
             rec["ledger_seeded"] = dict(data["positions"])
         else:
             data["positions"], data["strategy_cash"] = {}, cfg.risk.capital
-    ledger.check_account(Path(cfg.state_dir), cfg.account_group, account, symbols, data, cfg.risk.account_check)
+    ledger.check_account(Path(cfg.state_dir), cfg.account_group, account, symbols, data, today, cfg.risk.account_check)
     return ledger.positions(data)
 
 
