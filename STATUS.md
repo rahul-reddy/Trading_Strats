@@ -2,32 +2,30 @@
 
 ## Current handoff (2026-10-26)
 
-**Merged:** buckets (#20, 04e0744): tqqq-blend buckets own only the shares their own fills bought (IBKR orderRef,
-reconciled at 16:10 ET, the whole account checked against every bucket's ledger before a trade); the $20k mix
-bucket (`config.aws-paper-mix.toml`); reconcile alerts on the dashboard. Not yet deployed.
+**Revision:** the server runs `933695f` (main), deployed 2026-10-26 ~21:40 ET through deploy/push.sh: buckets (#20)
+and sleeves (#21). The IBKR paper account now holds five buckets, each with its own capital and share ledger
+(docs/BUCKETS.md): tqqq-blend $100k (15:30), tqqq-blend mix 20% $20k (15:32), and the sleeves rotation $30k,
+sectors $25k and quality $25k (15:34, one service). Fills are credited at 16:10 (trading-reconcile.timer).
 
-**In review:** sleeves (branch `feat/sleeves`): ETF rotation ($30k), SPDR sector momentum ($25k) and quality-value
-($25k) buckets for the owner's second $100k paper portfolio (20/30/25/25), their deploy (bundled by push.sh under
-`strategies/sleeves`, `sleeves-paper.timer` at 15:34-15:49 ET), and the dashboard's mix-portfolio view and
-holdings buckets. rules/schedule/ledger.py are now critical paths for review tiering.
+**Verified on 933695f:**
+- CI on both PR heads (incl. both image builds and the Windows harness); Gemini APPROVE, 0 blocking, on both.
+- On AWS after the deploy: both images built, all timers enabled. Dry runs (no orders) of all five buckets:
+  the $100k bucket seeded its ledger with the account's 233 TQQQ (no change: inside its band); the mix bucket
+  would buy 48 TQQQ; the sleeves (forced decision) would buy DBC/EFA/QQQ/SPY, XLE/XLK/XLV and 19 stocks, on
+  Finviz quotes; every run passed the cross-bucket account check.
 
-**Verified on feat/sleeves (local, Windows):** tqqq-blend `ruff`, `mypy` clean, `pytest` all passed with Chromium
-(incl. portfolio and holdings browser tests, phone width, dark mode); sleeves `ruff`, `mypy` clean, `pytest` 63
-passed; harness self-test passed. Live smoke: `signal` for all three sleeves on real data and Finviz (rotation
-DBC/SPY/QQQ/EFA; sectors XLE/XLK/XLV; quality 19 stocks); a local paper rebalance credited its fills to the ledger.
-Backtests with the live rules: rotation 9.5% CAGR, -18.4% max DD since 2008; sectors 7.9%, -24.8% since 2000; the
-20/30/25/25 mix 11.1%, -17.9% (SPY 11.8%, -46.3%), quality from its CRSP proxy (sleeves/STRATEGY.md).
-
-**Running:** the server still runs `41f8d47`: tqqq-blend paper, $100k.
+**Not yet verified:** the 16:35 dashboard publish with the mix-portfolio view and the new buckets (first build
+2026-10-27); a live reconcile of real MOC fills (first sleeves orders 2026-10-30). The sleeves dry runs left a
+dry-run "Latest decision" on their dashboard cards until then.
 
 **Remaining:**
-- sleeves: CI, cross-review, merge; then deploy both merges with deploy/push.sh, and check the first run seeds the
-  $100k bucket's ledger, the mix bucket and the sleeves buckets value themselves, and the 16:10 reconcile runs.
-- First sleeves rebalance: Friday 2026-10-30 (month end). Check orders, fills and the dashboard that evening.
+- After the 2026-10-27 close: check the mix bucket's first real TQQQ order filled and the 16:10 reconcile
+  credited it (`reconcile.jsonl`, `fills.csv`), and the dashboard shows the portfolio and five buckets.
+- 2026-10-30 (month end): the sleeves' first rebalance. Check orders, fills and reconcile that evening.
 - Schwab: no fill reports, so a Schwab profile refuses to trade (none is deployed).
 - Live: store the new IBKR live user's login once IBKR approves it, deploy, approve the push, run ibkr-check.
 
-**Next action:** open the sleeves PR, run CI and scripts/cross-review.ps1, merge, deploy.
+**Next action:** after the 2026-10-27 close, check the reconcile and the dashboard (above).
 
 ## History
 
