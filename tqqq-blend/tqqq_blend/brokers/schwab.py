@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 
-from .base import Order
+from .base import Fill, Order
 
 
 class SchwabBroker:
@@ -75,3 +75,8 @@ class SchwabBroker:
         from schwab.utils import Utils
 
         return f"schwab#{Utils(self.client, self.account_hash).extract_order_id(r)}"
+
+    def fills(self, ref: str) -> list[Fill]:
+        # A bucket's shares come only from its own fills (ledger.py). Schwab has no orderRef equivalent wired
+        # up here, so a Schwab run refuses rather than guess which shares in the account are this bucket's.
+        raise NotImplementedError("Schwab fill reports are not implemented; bucket ledgers need them (ledger.py)")

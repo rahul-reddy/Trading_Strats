@@ -3,6 +3,7 @@
   backtest      full-history backtest of the blend and each sleeve (synthetic TQQQ/SQQQ from 1999)
   signal        today's signal and sleeve diagnostics from end-of-day data (no broker needed)
   run           the near-close process: compute targets, plan orders, execute (dry-run by default)
+  reconcile     after the close: credit today's fills to this bucket's ledger (read-only; places nothing)
   ibkr-check    read-only IBKR connection test: account, balances, positions, quotes (never places orders)
   schwab-login  one-time (and weekly) Schwab OAuth login that writes the token file
   dashboard     static HTML dashboard of runs, decisions and performance from each profile's state
@@ -36,10 +37,12 @@ def main():
     r.add_argument("--broker", choices=["paper", "ibkr", "schwab"])
     r.add_argument("--live", action="store_true", help="actually send orders (also needs live_trading_enabled)")
     r.add_argument("--force", action="store_true", help="ignore the near-close window and stale-data check")
+    sub.add_parser("reconcile")
     sub.add_parser("ibkr-check")
     sub.add_parser("schwab-login")
     d = sub.add_parser("dashboard")
-    d.add_argument("--profiles", nargs="+", default=["config.ibkr-paper.toml", "config.ibkr-live.toml"])
+    profiles = ["config.ibkr-paper.toml", "config.aws-paper-mix.toml", "config.ibkr-live.toml"]
+    d.add_argument("--profiles", nargs="+", default=profiles)
     d.add_argument("--out", default="state/dashboard")
     args = ap.parse_args()
 
@@ -105,6 +108,11 @@ def main():
         from .runner import run_once
 
         print(json.dumps(run_once(cfg, live=args.live, force=args.force), indent=2, default=str))
+
+    elif args.cmd == "reconcile":
+        from .runner import reconcile
+
+        print(json.dumps(reconcile(cfg), indent=2, default=str))
 
     elif args.cmd == "ibkr-check":
         from .brokers.ibkr import IBKRBroker

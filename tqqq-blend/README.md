@@ -84,13 +84,16 @@ Schwab has no paper trading API, so test against IBKR paper or the local paper b
    - halt if QQQ moved more than 8% today
    - halt if strategy equity is 50% or more below its peak (needs a manual reset)
    - reject any order larger than `max_order_value`
-4. **Plan.** Diff target shares against broker positions. Skip changes inside the 10% band. Sells go first.
-5. **Execute.** Orders are only sent when `--live` is passed **and** `live_trading_enabled = true`. Otherwise the run logs DRY-RUN. The paper broker always fills.
-6. **Log** to `state/runs.jsonl` (every run, with the sleeve values), `state/trades.csv`, and `tqqq_blend.log`.
+4. **Ledger.** Read this bucket's own shares and cash (`ledger.py`), and stop unless the account holds exactly what every bucket's ledger on it adds up to (`docs/BUCKETS.md`), or if an earlier day's order was never matched to fills.
+5. **Plan.** Diff target shares against the bucket's shares. Skip changes inside the 10% band. Sells go first.
+6. **Execute.** Orders are only sent when `--live` is passed **and** `live_trading_enabled = true`. Otherwise the run logs DRY-RUN. The paper broker always fills. Each order carries the bucket's tag (IBKR `orderRef`).
+7. **Log** to `state/runs.jsonl` (every run, with the sleeve values), `state/trades.csv`, and `tqqq_blend.log`.
+
+After the close, `python -m tqqq_blend reconcile` credits the day's fills to the bucket (`state/fills.csv`, `state/reconcile.jsonl`). On AWS it runs at 16:10 ET.
 
 **Kill switch:** `New-Item state\STOP` stops trading on the next run. Delete the file to resume. Existing positions are not closed automatically.
 
-**Strategy capital:** the strategy keeps its own cash ledger, seeded with `risk.capital`, so it can share an account with other holdings. It never sizes above the account's net liquidation value.
+**Strategy capital (buckets):** each profile is a bucket with its own ledger of cash and shares, seeded with `risk.capital`, so several buckets (other strategies, or another copy of this one such as `config.aws-paper-mix.toml`) can share an account and even trade the same symbols. A bucket owns only the shares its own fills bought. It never sizes above the account's net liquidation value. See [docs/BUCKETS.md](../docs/BUCKETS.md).
 
 ## Scheduling (Windows)
 

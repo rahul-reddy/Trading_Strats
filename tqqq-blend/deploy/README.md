@@ -15,7 +15,9 @@ stopped too) and ~$0.20 for the public IP. Running it all the time would cost ab
 15:00  server starts; both gateways log in
 ~15:02 IBKR Mobile push for the live account -> approve it
 15:30  first run: paper places orders, live logs the orders it would place (dry run)
+15:32  the mix portfolio's 20% bucket runs (every 5 minutes to 15:52, two minutes after the $100k bucket)
 15:50  last run of the window (runs after the first successful one do nothing)
+16:10  reconcile: each paper bucket's fills are credited to its own ledger (docs/BUCKETS.md)
 16:30  state (ledgers, trade logs) is copied to S3
 16:35  the dashboard is rebuilt from that state and published (password-protected)
 16:45  server stops
@@ -47,13 +49,16 @@ deploy/
   Dockerfile, docker-compose.yml
   push.sh                       merged commit -> git archive -> S3 -> SSM Run Command -> server/install.sh
   server/install.sh             installs Docker, pulls secrets from SSM, starts gateways, enables timers
-  server/*.service, *.timer     paper runs (orders on), live runs (dry run), daily state backup, dashboard
+  server/*.service, *.timer     paper runs (orders on), live runs (dry run), post-close reconcile, state backup,
+                                dashboard
+  server/reconcile.sh           credits each paper bucket's fills to its ledger after the close
   server/publish-dashboard.sh   builds the dashboard page and uploads it to Amplify, only behind the password
 ```
 
 | Account | Gateway | Strategy config | Orders |
 |---|---|---|---|
 | Paper | `ibgw-paper` | `config.aws-paper.toml` -> `config.ibkr-paper.toml` | on |
+| Paper, mix 20% bucket | `ibgw-paper` | `config.aws-paper-mix.toml` -> `config.aws-paper.toml` | on |
 | Live | `ibgw-live` | `config.aws-live.toml` -> `config.ibkr-live.toml` | off (dry run, logs the plan) |
 
 ## First-time setup

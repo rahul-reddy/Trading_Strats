@@ -4,11 +4,12 @@ Use it to forward-test the full daily process before connecting a real account."
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import yfinance as yf
 
-from .base import Order
+from .base import Fill, Order
 
 
 class PaperBroker:
@@ -24,6 +25,7 @@ class PaperBroker:
             self.acct = json.loads(self.path.read_text())
         else:
             self.acct = {"cash": self.start_cash, "positions": {}}
+        self.acct.setdefault("fills", [])
 
     def disconnect(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -42,4 +44,19 @@ class PaperBroker:
         px = self.last_price(order.symbol)
         self.acct["cash"] -= order.signed_qty * px
         self.acct["positions"][order.symbol] = self.acct["positions"].get(order.symbol, 0) + order.signed_qty
+        exec_id = f"paper-{len(self.acct['fills']) + 1}"
+        self.acct["fills"].append(
+            {
+                "exec_id": exec_id,
+                "ref": order.ref,
+                "symbol": order.symbol,
+                "shares": order.signed_qty,
+                "price": px,
+                "commission": 0.0,
+                "time": datetime.now().isoformat(timespec="seconds"),
+            }
+        )
         return f"paper-fill@{px:.2f}"
+
+    def fills(self, ref: str) -> list[Fill]:
+        return [Fill(**f) for f in self.acct["fills"] if f["ref"] == ref]

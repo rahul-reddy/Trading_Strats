@@ -69,6 +69,21 @@ def read_runs(state_dir: Path) -> tuple[list[dict], int]:
     return sorted(runs, key=lambda r: r["ts"]), bad
 
 
+def last_reconcile(state_dir: Path) -> dict | None:
+    """The latest post-close reconcile record (runner.reconcile), or None if there is none or it can't be read."""
+    path = state_dir / "reconcile.jsonl"
+    if not path.exists():
+        return None
+    for line in reversed(path.read_text(encoding="utf-8").splitlines()):
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            return {"ts": None, "status": "error: the last line of reconcile.jsonl can't be read"}
+        if isinstance(rec, dict):
+            return rec
+    return None
+
+
 def read_trades(state_dir: Path) -> list[dict]:
     path = state_dir / "trades.csv"
     if not path.exists():
@@ -143,7 +158,8 @@ def summarize_profile(cfg: Config, now: pd.Timestamp) -> dict:
     runs, bad_lines = read_runs(state_dir)
     state = json.loads((state_dir / "state.json").read_text()) if (state_dir / "state.json").exists() else {}
     account: dict[str, Any] = {
-        "name": "Paper" if paper else "Live",
+        "name": cfg.label or ("Paper" if paper else "Live"),
+        "bucket": cfg.bucket,
         "broker": b.name,
         "mode": "paper" if paper else ("live" if b.live_trading_enabled else "live-disabled"),
         "capital": cfg.risk.capital,
@@ -153,6 +169,7 @@ def summarize_profile(cfg: Config, now: pd.Timestamp) -> dict:
         "kill_switch": (state_dir / "STOP").exists(),
         "halted": state.get("halted"),
         "unreadable_run_lines": bad_lines,
+        "reconcile": last_reconcile(state_dir),
         "runs_total": len(runs),
     }
     if not runs:

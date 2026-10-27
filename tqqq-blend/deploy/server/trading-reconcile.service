@@ -1,0 +1,9 @@
+[Unit]
+Description=Credit today's fills to each paper bucket's ledger (read-only; places no orders)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/trading/app/deploy
+ExecStart=/bin/bash /opt/trading/app/deploy/server/reconcile.sh

@@ -74,9 +74,12 @@ for acct in paper live; do
   if [ -n "$user" ]; then
     docker compose --profile $acct up -d ibgw-$acct
     systemctl enable --now tqqq-$acct.timer
+    # paper also runs the mix bucket and the post-close reconcile of the paper buckets' fills
+    [ $acct = live ] || systemctl enable --now tqqq-paper-mix.timer trading-reconcile.timer
   else
     docker compose --profile $acct rm -sf ibgw-$acct >/dev/null 2>&1 || true
     systemctl disable --now tqqq-$acct.timer 2>/dev/null || true
+    [ $acct = live ] || systemctl disable --now tqqq-paper-mix.timer trading-reconcile.timer 2>/dev/null || true
     echo "No $acct login in SSM: $acct gateway and timer are off."
   fi
 done

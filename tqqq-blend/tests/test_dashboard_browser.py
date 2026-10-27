@@ -6,6 +6,7 @@ dark mode.
 Needs `uv run playwright install chromium` once. Locally the tests skip if the browser is missing;
 CI sets DASHBOARD_BROWSER_REQUIRED=1 so they fail instead of skipping."""
 
+import json
 import os
 
 import pandas as pd
@@ -210,4 +211,29 @@ def test_order_reason_sits_under_its_order(browser, tmp_path):
     why = order.locator(".order-why").bounding_box()
     assert why["y"] >= line["y"] + line["height"] - 1  # below its order line, not squeezed beside it
     assert errors == []
+    page.close()
+
+
+@pytest.mark.parametrize(
+    ("status", "level"),
+    [
+        ("error: IB not connected", "Failing"),
+        ("reconciled, 1 still pending", "Needs a look"),
+        ("reconciled", "Healthy"),
+    ],
+)
+def test_reconcile_status_shows_as_an_alert(browser, tmp_path, status, level):
+    write_state(tmp_path / "paper", end="2026-10-20", missed=None)
+    (tmp_path / "paper" / "reconcile.jsonl").write_text(json.dumps({"ts": "2026-10-20T16:10:00", "status": status}))
+    profile = write_profile(tmp_path / "p.toml", "config.ibkr-paper.toml", tmp_path / "paper")
+    url = build([str(profile)], tmp_path / "out", now=pd.Timestamp("2026-10-20 17:00", tz="America/New_York")).as_uri()
+    page, errors = open_page(browser, url, now="2026-10-20 18:00", viewport={"width": 1300, "height": 900})
+    assert errors == []
+    sec = page.locator(".account").first
+    assert level in sec.locator(".acct-head").inner_text()
+    alerts = sec.locator(".alerts")
+    if level == "Healthy":
+        assert alerts.count() == 0 or "reconcile" not in alerts.inner_text()
+    else:
+        assert "reconcile" in alerts.inner_text() and status in alerts.inner_text()
     page.close()

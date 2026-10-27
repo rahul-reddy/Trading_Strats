@@ -2,9 +2,13 @@
 #   python -m tqqq_blend --config config.ibkr-live.toml ibkr-check
 # Orders stay disabled until live_trading_enabled = true here AND the run passes --live.
 extends = "config.toml"
-state_dir = "state/ibkr-live"    # its own cash ledger, equity peak, and trade log
+state_dir = "state/ibkr-live"    # its own ledger (cash and shares), equity peak, and trade log
+bucket = "tqqq-blend/live"
+account_group = "ibkr-live"
+label = "Live"
 
 [risk]
+account_check = "at_least"       # your own TQQQ/SQQQ in this account are allowed on top of the bucket's shares
 capital = 10000                  # dollars of the account this strategy may use; start at 10-25% of the target
 max_order_value = 15000
 

@@ -1,0 +1,16 @@
+# A second tqqq-blend bucket in the IBKR paper account: the 20% slice of the $100k "mix" paper portfolio
+# (20% tqqq-blend / 30% ETF rotation / 25% sector momentum / 25% quality-value; the other three are in sleeves/).
+# It shares the account with the $100k bucket in config.aws-paper.toml and trades the same symbols, so each
+# bucket owns only the shares its own fills bought (ledger.py, docs/BUCKETS.md).
+#   docker compose run --rm tqqq-paper-mix run --live      (what its timer runs)
+extends = "config.aws-paper.toml"
+state_dir = "state/ibkr-paper-mix"
+bucket = "tqqq-blend/paper-mix"
+label = "Paper · mix 20%"
+
+[risk]
+capital = 20000                  # owner, 2026-10-26: "another $100k in my paper portfolio", split 20-30-25-25
+max_order_value = 30000          # a full move into TQQQ is ~capital
+
+[broker]
+ibkr_client_id = 18              # its own API client, so its runs never collide with the $100k bucket's (17)

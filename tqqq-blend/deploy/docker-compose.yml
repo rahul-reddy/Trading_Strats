@@ -5,6 +5,7 @@
 #   docker compose --profile live up -d ibgw-live      # gateway for the live account
 # install.sh starts each gateway only when its login is in SSM.
 #   docker compose run --rm tqqq-paper run --live      # what the paper timer runs
+#   docker compose run --rm tqqq-paper reconcile       # post-close: credit today's fills to the bucket
 #   docker compose run --rm tqqq-paper ibkr-check      # read-only connection test
 #
 # Usernames come from deploy/.env, a link to /opt/trading/secrets/ibkr.env that install.sh writes
@@ -67,6 +68,11 @@ services:
     build: { context: .., dockerfile: deploy/Dockerfile }
     entrypoint: [ "python", "-m", "tqqq_blend", "--config", "config.aws-paper.toml" ]
 
+  # The mix portfolio's 20% tqqq-blend bucket: same account and image as tqqq-paper, its own ledger (ledger.py).
+  tqqq-paper-mix:
+    <<: *job
+    entrypoint: [ "python", "-m", "tqqq_blend", "--config", "config.aws-paper-mix.toml" ]
+
   tqqq-live:
     <<: *job
     entrypoint: [ "python", "-m", "tqqq_blend", "--config", "config.aws-live.toml" ]
@@ -76,7 +82,7 @@ services:
   dashboard:
     <<: *job
     entrypoint: [ "python", "-m", "tqqq_blend" ]
-    command: [ "dashboard", "--profiles", "config.aws-paper.toml", "config.aws-live.toml", "--out", "state/dashboard" ]
+    command: [ "dashboard", "--profiles", "config.aws-paper.toml", "config.aws-paper-mix.toml", "config.aws-live.toml", "--out", "state/dashboard" ]
     network_mode: none
 
 secrets:

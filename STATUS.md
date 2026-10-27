@@ -1,31 +1,29 @@
 # Status
 
-## Current handoff (2026-10-22)
+## Current handoff (2026-10-26)
 
-**Revision:** the server runs `41f8d47` (main), deployed 2026-10-22 08:11 ET through deploy/push.sh. The dashboard
-(redesign #16, trade reasons #17, layout fix #18) is live behind basic auth (stack output `DashboardUrl`; login
-in Secrets Manager `tqqq-trading-dashboard`) and republishes at 16:35 ET on weekdays. From the 2026-10-22 run on,
-each run records `why` (explain.py): each sleeve's rule and the blend to the target.
+**In progress:** buckets (branch `feat/buckets`, PR 1 of 2) for the owner's second $100k paper portfolio, split
+20% tqqq-blend / 30% ETF rotation / 25% SPDR sector momentum / 25% quality-value, each slice its own bucket in the
+shared IBKR paper account and on the dashboard (docs/BUCKETS.md). PR 1: tqqq-blend buckets own only the shares
+their own fills bought (orderRef-tagged, reconciled at 16:10 ET, checked against the whole account before each
+trade); the $20k mix bucket (`config.aws-paper-mix.toml`); reconcile alerts on the dashboard. PR 2: `sleeves/`
+with the other three buckets.
 
-**Verified on 41f8d47 (local, Windows, and CI on the PR heads):**
-- `pwsh -NoProfile -File scripts/cross-review-selftest.ps1`: passed
-- tqqq-blend: `ruff check`, `ruff format --check`, `mypy`: clean; `pytest`: 46 passed, including 13 Chromium
-  dashboard tests; the explained blend reproduces the recorded net on every day of three synthetic markets
-- On AWS: explain ran in the server container on live QQQ data and matched the Oct 21 decision; the dashboard
-  published, answers 401 without the password and renders with it
+**Verified on the feat/buckets working tree (local, Windows):** tqqq-blend `ruff check`, `ruff format --check`,
+`mypy` clean; `pytest` 88 passed with Chromium (runner.py 27% -> 96%, ledger.py 99%, brokers/ibkr.py 0% -> 51%);
+a local paper smoke run of two buckets: the second refused on a mismatched account, then traded in its own group.
 
-**Running:** tqqq-blend on AWS, the IBKR paper profile (config.aws-paper.toml), $100k strategy capital, Finviz
-quotes. Paper has run 2026-10-20 and 2026-10-21 (3 trades). The live profile has no login on the server yet.
+**Running:** the server still runs `41f8d47`: tqqq-blend on the IBKR paper profile, $100k, Finviz quotes. On the
+first run after this deploys, that bucket seeds its share ledger from the account's TQQQ/SQQQ once.
 
 **Remaining:**
-- Test coverage is thin where orders are made: runner.py 27%, brokers/ibkr.py and
-  brokers/schwab.py 0%. Add boundary tests for the run gates (window, kill switch, once per day,
-  drawdown halt, max_order_value) and for the IBKR account-type check.
-- Live: store the new IBKR live user's login once IBKR approves it, deploy, approve the push,
-  run ibkr-check. Confirm whether the gateway resends a missed 2FA push.
+- PR 1: CI, cross-review, merge, deploy; check the first 15:30 run seeded the ledger and the 16:10 reconcile ran.
+- PR 2: sleeves/ (ETF rotation, sector momentum, quality-value), its backtest, deploy, and the mix view on the
+  dashboard. First rebalance: Friday 2026-10-30 (month end).
+- brokers/schwab.py has no fill reports: a Schwab profile now refuses to trade (none is deployed).
+- Live: store the new IBKR live user's login once IBKR approves it, deploy, approve the push, run ibkr-check.
 
-**Next action:** after the 2026-10-22 close, confirm the 16:35 timer republished the dashboard on its own and that
-the 15:30 run recorded `why` (the decision card shows rule-by-rule reasons instead of the "before reasons" note).
+**Next action:** open PR 1, run CI and scripts/cross-review.ps1.
 
 ## History
 
