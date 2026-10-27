@@ -32,6 +32,7 @@ class Fill:
 
 class Broker(Protocol):
     name: str
+    reports_fills: bool  # False: the broker can't say what filled, so no bucket may trade through it
 
     def connect(self) -> None: ...
     def disconnect(self) -> None: ...

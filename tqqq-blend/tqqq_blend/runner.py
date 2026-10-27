@@ -231,7 +231,9 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
                 }
             )
             log.info("%s %s %d %s -> %s", o.side, o.symbol, o.quantity, o.order_type, result)
-        if armed and orders:  # market orders (and the local paper broker) fill at once: credit them now
+        # Market orders (and the local paper broker) fill at once: credit them now. MOC orders fill at the
+        # close and are credited by the post-close reconcile.
+        if armed and any(o.order_type == "MKT" for o in orders) or (armed and orders and cfg.broker.name == "paper"):
             settle_fills(store, broker.fills(cfg.bucket), today.date(), after_close=False)
         rec["status"] = ("executed" if armed else "dry-run") if orders else "no change"
         if armed:
@@ -251,6 +253,8 @@ def bucket_positions(cfg: Config, store: StateStore, broker, symbols: set[str], 
     account holds. A bucket from before ledgers is seeded once from the account; a new one starts with
     risk.capital in cash and no shares. Raises ledger.LedgerError instead of trading on doubtful shares."""
     data = store.data
+    if not getattr(broker, "reports_fills", False):
+        raise ledger.LedgerError(f"{broker.name} can't report fills, so this bucket's shares can't be tracked")
     data["bucket"], data["account_group"] = cfg.bucket, cfg.account_group
     today = pd.Timestamp.now(tz="America/New_York").date()
     stale = ledger.stale_pending(data, today)

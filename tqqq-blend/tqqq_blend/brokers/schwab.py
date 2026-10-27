@@ -15,6 +15,9 @@ from .base import Fill, Order
 
 class SchwabBroker:
     name = "schwab"
+    # A bucket's shares come only from its own fills (ledger.py), and fill reports aren't implemented here,
+    # so runner.bucket_positions refuses a Schwab run before anything is sent, and place() refuses as well.
+    reports_fills = False
 
     def __init__(self, cfg):
         self.cfg = cfg.broker
@@ -63,6 +66,8 @@ class SchwabBroker:
         return float(r.json()[symbol]["quote"]["lastPrice"])
 
     def place(self, order: Order) -> str:
+        if not self.reports_fills:
+            raise NotImplementedError("Schwab orders are off: without fill reports no bucket ledger could track them")
         from schwab.orders.common import Duration, OrderType, Session
         from schwab.orders.equities import equity_buy_market, equity_sell_market
 
@@ -77,6 +82,4 @@ class SchwabBroker:
         return f"schwab#{Utils(self.client, self.account_hash).extract_order_id(r)}"
 
     def fills(self, ref: str) -> list[Fill]:
-        # A bucket's shares come only from its own fills (ledger.py). Schwab has no orderRef equivalent wired
-        # up here, so a Schwab run refuses rather than guess which shares in the account are this bucket's.
         raise NotImplementedError("Schwab fill reports are not implemented; bucket ledgers need them (ledger.py)")

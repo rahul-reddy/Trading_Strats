@@ -23,6 +23,7 @@ DATA_TYPES = {1: "live", 2: "frozen", 3: "delayed", 4: "delayed-frozen"}
 
 class IBKRBroker:
     name = "ibkr"
+    reports_fills = True  # fills() works, so bucket ledgers can track this broker's orders
 
     def __init__(self, cfg):
         self.cfg = cfg.broker

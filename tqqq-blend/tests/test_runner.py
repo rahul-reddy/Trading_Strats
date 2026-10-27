@@ -40,6 +40,7 @@ class Account:
 
 class FakeBroker:
     name = "ibkr"
+    reports_fills = True
 
     def __init__(self, account):
         self.account = account
@@ -297,3 +298,25 @@ def test_a_reconcile_that_cannot_connect_is_recorded(tmp_path, market, monkeypat
     assert rec["status"] == "error: gateway not logged in"
     last = (Path(cfg.state_dir) / "reconcile.jsonl").read_text().splitlines()[-1]
     assert json.loads(last)["status"] == "error: gateway not logged in"
+
+
+def test_a_broker_without_fill_reports_sends_nothing(tmp_path, market, monkeypatch):
+    class NoFills(FakeBroker):
+        name = "schwab"
+        reports_fills = False
+
+    broker = NoFills(market["account"])
+    monkeypatch.setattr(runner, "make_broker", lambda cfg: broker)
+    cfg = bucket(tmp_path, "paper", 100_000)
+    rec = runner.run_once(cfg, live=True)
+    assert "can't report fills" in rec["status"] and broker.placed == [] and not market["account"].queued
+
+
+def test_schwab_place_refuses_before_sending():
+    from tqqq_blend.brokers import Order
+    from tqqq_blend.brokers.schwab import SchwabBroker
+
+    b = SchwabBroker(Config())
+    b.client = None  # any use of the client would fail differently
+    with pytest.raises(NotImplementedError, match="Schwab orders are off"):
+        b.place(Order("TQQQ", "BUY", 1, "MOC", "x"))
