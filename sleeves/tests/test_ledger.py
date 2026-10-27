@@ -61,11 +61,11 @@ def test_account_must_equal_the_sum_of_bucket_ledgers(tmp_path):
     write(tmp_path, "b", {"account_group": "g", "positions": {"TQQQ": 5, "SPY": 2}})
     write(tmp_path, "other", {"account_group": "elsewhere", "positions": {"TQQQ": 100}})
     mine = json.loads((a / "state.json").read_text())
-    ledger.check_account(a, "g", {"TQQQ": 15, "SPY": 2, "AAPL": 7}, {"TQQQ", "SQQQ"}, mine)  # AAPL: unmanaged
+    ledger.check_account(a, "g", {"TQQQ": 15, "SPY": 2, "AAPL": 7}, {"TQQQ", "SQQQ"}, mine, TODAY)  # AAPL: unmanaged
     with pytest.raises(ledger.LedgerError, match="TQQQ: account holds 16"):
-        ledger.check_account(a, "g", {"TQQQ": 16, "SPY": 2}, {"TQQQ"}, mine)
+        ledger.check_account(a, "g", {"TQQQ": 16, "SPY": 2}, {"TQQQ"}, mine, TODAY)
     with pytest.raises(ledger.LedgerError, match="SQQQ: account holds 3"):  # a symbol this bucket trades
-        ledger.check_account(a, "g", {"TQQQ": 15, "SPY": 2, "SQQQ": 3}, {"TQQQ", "SQQQ"}, mine)
+        ledger.check_account(a, "g", {"TQQQ": 15, "SPY": 2, "SQQQ": 3}, {"TQQQ", "SQQQ"}, mine, TODAY)
 
 
 def test_orders_in_flight_may_already_have_filled(tmp_path):
@@ -74,26 +74,26 @@ def test_orders_in_flight_may_already_have_filled(tmp_path):
     write(tmp_path, "b", {"account_group": "g", "positions": {"TQQQ": 5}, "pending_orders": [pend]})
     mine = {"account_group": "g", "positions": {}}
     for held in (5, 15):  # before and after b's market order filled
-        ledger.check_account(a, "g", {"TQQQ": held}, {"TQQQ"}, mine)
+        ledger.check_account(a, "g", {"TQQQ": held}, {"TQQQ"}, mine, TODAY)
     with pytest.raises(ledger.LedgerError):
-        ledger.check_account(a, "g", {"TQQQ": 16}, {"TQQQ"}, mine)
+        ledger.check_account(a, "g", {"TQQQ": 16}, {"TQQQ"}, mine, TODAY)
 
 
 def test_at_least_allows_the_owners_own_shares_on_top(tmp_path):
     a = write(tmp_path, "a", {"account_group": "g", "positions": {"TQQQ": 10}})
     mine = {"account_group": "g", "positions": {"TQQQ": 10}}
-    ledger.check_account(a, "g", {"TQQQ": 50}, {"TQQQ"}, mine, mode="at_least")
+    ledger.check_account(a, "g", {"TQQQ": 50}, {"TQQQ"}, mine, TODAY, mode="at_least")
     with pytest.raises(ledger.LedgerError):  # but never less than the bucket owns
-        ledger.check_account(a, "g", {"TQQQ": 9}, {"TQQQ"}, mine, mode="at_least")
+        ledger.check_account(a, "g", {"TQQQ": 9}, {"TQQQ"}, mine, TODAY, mode="at_least")
     with pytest.raises(ValueError):
-        ledger.check_account(a, "g", {}, set(), mine, mode="loose")
+        ledger.check_account(a, "g", {}, set(), mine, TODAY, mode="loose")
 
 
 def test_a_sibling_without_a_ledger_stops_the_run(tmp_path):
     a = write(tmp_path, "a", {"account_group": "g", "positions": {}})
     write(tmp_path, "old", {"account_group": "g", "strategy_cash": 5.0})
     with pytest.raises(ledger.LedgerError, match="no share ledger"):
-        ledger.check_account(a, "g", {}, {"TQQQ"}, {"account_group": "g", "positions": {}})
+        ledger.check_account(a, "g", {}, {"TQQQ"}, {"account_group": "g", "positions": {}}, TODAY)
 
 
 def test_unreadable_sibling_stops_the_run(tmp_path):
@@ -101,7 +101,7 @@ def test_unreadable_sibling_stops_the_run(tmp_path):
     (tmp_path / "bad").mkdir()
     (tmp_path / "bad" / "state.json").write_text("{not json")
     with pytest.raises(ledger.LedgerError, match="can't read"):
-        ledger.check_account(a, "g", {}, set(), {"account_group": "g", "positions": {}})
+        ledger.check_account(a, "g", {}, set(), {"account_group": "g", "positions": {}}, TODAY)
 
 
 def test_seed_from_broker_takes_own_symbols_once_it_has_traded(tmp_path):
@@ -132,3 +132,13 @@ def test_record_pending_keeps_order_details():
     data: dict = {}
     ledger.record_pending(data, [Order("TQQQ", "BUY", 3, "MOC", "a")], TODAY, ["ibkr#1"])  # type: ignore[arg-type]
     assert data["pending_orders"] == [{"date": TODAY, "symbol": "TQQQ", "side": "BUY", "qty": 3, "result": "ibkr#1"}]
+
+
+def test_an_old_pending_order_on_a_sibling_explains_nothing(tmp_path):
+    a = write(tmp_path, "a", {"account_group": "g", "positions": {}})
+    old = {"date": "2026-10-26", "symbol": "TQQQ", "side": "BUY", "qty": 10, "result": "r"}
+    write(tmp_path, "b", {"account_group": "g", "positions": {"TQQQ": 5}, "pending_orders": [old]})
+    mine = {"account_group": "g", "positions": {}}
+    ledger.check_account(a, "g", {"TQQQ": 5}, {"TQQQ"}, mine, TODAY)
+    with pytest.raises(ledger.LedgerError):  # it may have filled yesterday, but nobody knows
+        ledger.check_account(a, "g", {"TQQQ": 15}, {"TQQQ"}, mine, TODAY)

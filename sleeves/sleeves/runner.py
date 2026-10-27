@@ -223,6 +223,7 @@ def run_once(cfg: Config, live: bool = False, force: bool = False, check_now: bo
             broker.positions(),
             set(held) | set(targets or {}),
             data,
+            today,
             risk.account_check,
         )
         rec["prices"] = {s: prices[s] for s in sorted(set(held) | set(targets or {}) | {sc.benchmark})}

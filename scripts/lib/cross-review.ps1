@@ -158,7 +158,7 @@ function Get-ReviewerModel {
 # list in AGENTS.md "Cross-model code review": any touch here gets the critical
 # tier, regardless of what else changed alongside it.
 $script:CriticalPathPatterns = @(
-    '^[^/]+/[^/]+/(runner|strategy|quotes|data|config|risk)\.py$',  # signal, sizing, prices, settings
+    '^[^/]+/[^/]+/(runner|strategy|quotes|data|config|risk|rules|schedule|ledger)\.py$',  # signal, sizing, prices, settings, which shares a bucket owns
     '^[^/]+/[^/]+/brokers/',                                         # order transmission
     '^[^/]+/config[^/]*\.toml$',                                     # capital, limits, live switches
     '^[^/]+/deploy/',                                                # server, IAM, secrets, schedules

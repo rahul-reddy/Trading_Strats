@@ -82,11 +82,16 @@ def main():
 
         rec = run_once(cfg, live=args.live, force=args.force, check_now=args.check_now)
         print(json.dumps(rec, indent=2, default=str))
+        if str(rec.get("status", "")).startswith("error"):
+            raise SystemExit(1)  # so the timer's wrapper script, and the systemd unit, show the failure
 
     elif args.cmd == "reconcile":
         from .runner import reconcile
 
-        print(json.dumps(reconcile(cfg), indent=2, default=str))
+        rec = reconcile(cfg)
+        print(json.dumps(rec, indent=2, default=str))
+        if str(rec.get("status", "")).startswith("error"):
+            raise SystemExit(1)  # so deploy/server/reconcile.sh, and the systemd unit, show the failure
 
     elif args.cmd == "ibkr-check":
         from .brokers.ibkr import IBKRBroker

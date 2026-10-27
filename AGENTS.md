@@ -4,7 +4,7 @@ Automated trading strategies that place real orders through Interactive Brokers 
 folder per strategy. Read docs/PLAN.md and STATUS.md before changing behavior.
 
 ## Layout
-- <strategy>/ (today: tqqq-blend/): one self-contained strategy: its package, tests/, config*.toml, deploy/, README, STRATEGY.md, WORKFLOW.md, pyproject.toml and uv.lock.
+- <strategy>/ (today: tqqq-blend/, sleeves/): one self-contained strategy: its package, tests/, config*.toml, deploy/, README, STRATEGY.md, WORKFLOW.md, pyproject.toml and uv.lock.
 - <strategy>/deploy/: that strategy's AWS server (CloudFormation, Docker Compose, IB Gateway, systemd timers, push.sh).
 - scripts/: the cross-model review and merge harness (PowerShell) and skill validation.
 - docs/: plan, decisions and the agent harness; .agents/skills/: the repository change-workflow skill.
@@ -73,7 +73,7 @@ merges on its own model's approval alone.
 - **Blast-radius tiering** (`Get-BlastRadiusTier` in `scripts/lib/cross-review.ps1`)
   classifies the changed files into `critical` / `standard` / `low`, which
   `Get-ReviewerEffort` and `Get-ReviewerModel` both key off (below). `critical` (any path matching `$script:CriticalPathPatterns`: a strategy's
-  `<strategy>/<package>/{runner,strategy,quotes,data,config,risk}.py`, `<strategy>/<package>/brokers/`,
+  `<strategy>/<package>/{runner,strategy,quotes,data,config,risk,rules,schedule,ledger}.py`, `<strategy>/<package>/brokers/`,
   `<strategy>/config*.toml`, `<strategy>/deploy/`, `scripts/` and `.github/workflows/`) is meant to
   get each CLI's highest effort, though the owner-chosen per-tier settings below (see
   `Get-ReviewerEffort`) may deliberately fall short of that ceiling for cost reasons —

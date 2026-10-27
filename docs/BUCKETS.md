@@ -3,7 +3,8 @@
 The owner tests each strategy in its own **bucket**: its own capital, shares, performance and dashboard
 card, even when several buckets trade the same symbols in the same account. The IBKR paper account holds,
 for example, the $100k tqqq-blend bucket and the $100k "mix" portfolio's four buckets (20% tqqq-blend,
-30% ETF rotation, 25% sector momentum, 25% quality-value), and two of those trade TQQQ.
+30% ETF rotation, 25% sector momentum, 25% quality-value, the last three in sleeves/), and two of those
+trade TQQQ. The dashboard shows each bucket, and the mix as one portfolio (the sum of its buckets).
 
 So no bucket may treat the account's positions as its own. Each bucket owns exactly the shares its own
 fills bought, and the account must always hold what all the buckets' ledgers add up to.
