@@ -1,0 +1,11 @@
+[Unit]
+Description=Post-close reconcile at 16:10 ET on weekdays, before the 16:30 state backup
+
+# MOC orders fill at 16:00. IB reports only the current day's executions, so this must run before the
+# server stops at 16:45; a bucket whose orders were never matched to fills refuses to trade the next day.
+[Timer]
+OnCalendar=Mon..Fri *-*-* 16:10:00 America/New_York
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

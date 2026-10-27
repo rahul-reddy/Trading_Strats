@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import math
 
-from .base import Order
+from .base import Fill, Order
 
 # TWS / IB Gateway ports, plus 4004 / 4003 used by the ib-gateway Docker image (deploy/docker-compose.yml)
 PAPER_PORTS, LIVE_PORTS = {7497, 4002, 4004}, {7496, 4001, 4003}
@@ -23,6 +23,7 @@ DATA_TYPES = {1: "live", 2: "frozen", 3: "delayed", 4: "delayed-frozen"}
 
 class IBKRBroker:
     name = "ibkr"
+    reports_fills = True  # fills() works, so bucket ledgers can track this broker's orders
 
     def __init__(self, cfg):
         self.cfg = cfg.broker
@@ -105,9 +106,37 @@ class IBKRBroker:
             o = MarketOrder(order.side, order.quantity)
         o.account = self._account()
         o.tif = "DAY"
+        o.orderRef = order.ref  # the bucket's tag: fills() credits executions back to that bucket only
         trade = self.ib.placeOrder(self._contract(order.symbol), o)
         self.ib.sleep(2)
         return f"ibkr#{trade.order.orderId} {trade.orderStatus.status}"
+
+    def fills(self, ref: str) -> list[Fill]:
+        """Today's executions for this account that carry `ref` (IB returns the current day's executions).
+        Commission reports arrive after the execution, so this waits briefly for them; a commission that
+        still hasn't arrived counts as 0 and the fill says so in its `commission` being exactly 0."""
+        from ib_async import ExecutionFilter
+
+        found = self.ib.reqExecutions(ExecutionFilter(acctCode=self._account()))
+        self.ib.sleep(1)
+        out = []
+        for f in found:
+            e = f.execution
+            if e.orderRef != ref:
+                continue
+            fee = f.commissionReport.commission if f.commissionReport else 0.0
+            out.append(
+                Fill(
+                    exec_id=e.execId,
+                    ref=e.orderRef,
+                    symbol=f.contract.symbol,
+                    shares=int(e.shares) if e.side == "BOT" else -int(e.shares),
+                    price=float(e.price),
+                    commission=float(fee) if fee is not None and math.isfinite(fee) else 0.0,
+                    time=e.time.isoformat() if hasattr(e.time, "isoformat") else str(e.time),
+                )
+            )
+        return out
 
     def describe(self) -> dict:
         """Read-only snapshot for `ibkr-check`: account, balances, positions, open orders, quote quality."""

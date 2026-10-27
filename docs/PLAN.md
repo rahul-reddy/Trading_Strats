@@ -13,6 +13,7 @@ second AI model before it merges.
 | Strategy | Stage | Notes |
 |---|---|---|
 | tqqq-blend | 3. Broker paper (IBKR paper, $100k strategy capital) since 2026-10-20 | Live account: dry runs once the new IBKR user is approved |
+| Mix portfolio ($100k paper, 2026-10-26) | 3. Broker paper (planned) | 20% tqqq-blend (`config.aws-paper-mix.toml`), 30% ETF rotation, 25% sector momentum, 25% quality-value (sleeves/, next PR); each slice is its own bucket |
 
 Stages are defined in tqqq-blend/README.md ("Going live in stages"): backtest, local paper, broker
 paper (4+ weeks), live small (3+ months), scale.
@@ -38,3 +39,11 @@ paper (4+ weeks), live small (3+ months), scale.
   login, replacing the Gemini CLI (API key: 429 on every review). Antigravity offers Gemini 3.8
   Flash only. Gemini reviews every tier, critical included, at high effort (medium on low-tier
   diffs; owner, same day).
+- 2026-10-26: Buckets (owner: "test individual strategies in their own buckets even though there is
+  an overlap", shown on the dashboard). Several strategies share the IBKR paper account, each with its
+  own capital and a ledger of the shares its own fills bought (IBKR orderRef), reconciled after the
+  close and checked against the whole account before every trade (docs/BUCKETS.md).
+- 2026-10-26: A second $100k paper portfolio, split 20% tqqq-blend / 30% ETF rotation / 25% sector
+  momentum / 25% quality-value (owner's split). Momentum uses the SPDR sector ETFs rather than 25 single
+  stocks: similar backtest (2000-2026: 8.2% CAGR, -22% max drawdown vs 7.3%, -19%), testable exactly
+  as traded, and the sector cap the owner asked for is built in.

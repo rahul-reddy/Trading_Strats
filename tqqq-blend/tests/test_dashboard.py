@@ -147,3 +147,27 @@ def test_trades_carry_their_runs_reasons(built):
         assert t["why"]["net"] == pytest.approx(float(t["net_signal"]), abs=1e-3)
     for t in older:  # earlier runs predate it: the target is still known, the rules are not
         assert t["why"]["rules"] == [] and t["why"]["net"] is not None
+
+
+def test_bucket_label_and_reconcile_record(tmp_path):
+    write_state(tmp_path / "mix")
+    (tmp_path / "mix" / "reconcile.jsonl").write_text(
+        json.dumps({"ts": "2026-10-19T16:10:00", "status": "nothing pending"})
+        + "\n"
+        + json.dumps({"ts": "2026-10-20T16:10:00", "status": "reconciled, 1 still pending"})
+        + "\n"
+    )
+    profile = write_profile(tmp_path / "mix.toml", "config.aws-paper-mix.toml", tmp_path / "mix")
+    data = page_data(build([str(profile)], tmp_path / "out", now=NOW).read_text(encoding="utf-8"))
+    mix = data["strategies"][0]["accounts"][0]
+    assert mix["name"] == "Paper · mix 20%" and mix["bucket"] == "tqqq-blend/paper-mix"
+    assert mix["capital"] == 20_000
+    assert mix["reconcile"]["status"] == "reconciled, 1 still pending"
+
+
+def test_unreadable_reconcile_log_is_an_error_not_silence(tmp_path):
+    write_state(tmp_path / "paper")
+    (tmp_path / "paper" / "reconcile.jsonl").write_text("{broken\n")
+    profile = write_profile(tmp_path / "p.toml", "config.ibkr-paper.toml", tmp_path / "paper")
+    data = page_data(build([str(profile)], tmp_path / "out", now=NOW).read_text(encoding="utf-8"))
+    assert data["strategies"][0]["accounts"][0]["reconcile"]["status"].startswith("error")

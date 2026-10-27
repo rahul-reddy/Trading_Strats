@@ -10,14 +10,29 @@ class Order:
     side: str  # "BUY" | "SELL"
     quantity: int
     order_type: str  # "MOC" | "MKT"
+    ref: str = ""  # the bucket that placed it (IBKR orderRef); its fills are credited to that bucket only
 
     @property
     def signed_qty(self) -> int:
         return self.quantity if self.side == "BUY" else -self.quantity
 
 
+@dataclass
+class Fill:
+    """One execution, as the broker reported it. `shares` is signed: positive bought, negative sold."""
+
+    exec_id: str
+    ref: str
+    symbol: str
+    shares: int
+    price: float
+    commission: float
+    time: str  # ISO timestamp of the execution
+
+
 class Broker(Protocol):
     name: str
+    reports_fills: bool  # False: the broker can't say what filled, so no bucket may trade through it
 
     def connect(self) -> None: ...
     def disconnect(self) -> None: ...
@@ -25,6 +40,7 @@ class Broker(Protocol):
     def positions(self) -> dict[str, int]: ...
     def last_price(self, symbol: str) -> float: ...
     def place(self, order: Order) -> str: ...
+    def fills(self, ref: str) -> list[Fill]: ...
 
 
 def make_broker(cfg) -> Broker:

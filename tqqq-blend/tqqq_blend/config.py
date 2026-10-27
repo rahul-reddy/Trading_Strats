@@ -89,6 +89,10 @@ class RiskConfig:
     min_minutes_to_close: int = 5
     max_minutes_to_close: int = 30
     volume_projection: float = 1.15  # partial-day volume * this ~ full-day volume at T-15min
+    # How the account must compare with the buckets' ledgers before trading (ledger.check_account):
+    # "exact" = it holds exactly what they add up to (a dedicated account, e.g. paper);
+    # "at_least" = at least that, so the owner's own shares of the same symbols on top are allowed (live).
+    account_check: str = "exact"
 
 
 @dataclass
@@ -117,6 +121,12 @@ class Config:
     risk: RiskConfig = field(default_factory=RiskConfig)
     broker: BrokerConfig = field(default_factory=BrokerConfig)
     state_dir: str = "state"
+    # Buckets (ledger.py): several strategies share one broker account, each with its own capital and shares.
+    bucket: str = "tqqq-blend/local"  # this profile's order tag (IBKR orderRef); unique per account
+    # Buckets with the same account_group share one account and are checked together. The local paper broker
+    # keeps a simulated account per state_dir, so local paper profiles each need their own account_group.
+    account_group: str = "local-paper"
+    label: str = ""  # name on the dashboard; blank = "Paper" or "Live"
 
 
 def _apply(obj, overrides: dict):
@@ -147,6 +157,7 @@ def load_config(path: str | Path | None = None) -> Config:
     data = _read(Path(path))
     for section in ("strategy", "risk", "broker"):
         _apply(getattr(cfg, section), data.get(section, {}))
-    if "state_dir" in data:
-        cfg.state_dir = data["state_dir"]
+    for key in ("state_dir", "bucket", "account_group", "label"):
+        if key in data:
+            setattr(cfg, key, data[key])
     return cfg

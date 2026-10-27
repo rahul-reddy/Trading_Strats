@@ -3,9 +3,12 @@
 1. Gate: trading day? within the [min, max] minutes-to-close window? kill switch absent?
 2. Signal: QQQ history + live price -> blended target weights for TQQQ / SQQQ.
 3. Risk: data sanity, drawdown breaker, order-size cap.
-4. Plan: diff target shares vs broker positions, skip changes inside the rebalance band.
-5. Execute (only with --live AND broker.live_trading_enabled): sells first, then buys.
-6. Log: state/trades.csv, state/runs.jsonl, state/state.json (equity peak).
+4. Ledger: this bucket's own shares and cash (ledger.py), checked against the whole account.
+5. Plan: diff target shares vs the bucket's shares, skip changes inside the rebalance band.
+6. Execute (only with --live AND broker.live_trading_enabled): sells first, then buys, tagged with the bucket.
+7. Log: state/trades.csv, state/runs.jsonl, state/state.json (ledger, equity peak).
+
+After the close, `reconcile` credits the day's fills to the bucket (see reconcile()).
 """
 
 from __future__ import annotations
@@ -19,7 +22,9 @@ from pathlib import Path
 import pandas as pd
 import pandas_market_calendars as mcal
 
+from . import ledger
 from .brokers import Order, make_broker
+from .brokers.ibkr import IBKRBroker
 from .config import Config
 from .data import live_signal_bars
 from .explain import explain
@@ -74,14 +79,22 @@ class StateStore:
         self.data = json.loads(self.path.read_text()) if self.path.exists() else {}
 
     def save(self):
-        self.path.write_text(json.dumps(self.data, indent=2, default=str))
+        # Atomic: other buckets on the account read this file (ledger.check_account) while this one runs,
+        # and a half-written file would stop their runs.
+        tmp = self.path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(self.data, indent=2, default=str))
+        tmp.replace(self.path)
 
     def append_run(self, rec: dict):
         with open(self.dir / "runs.jsonl", "a") as f:
             f.write(json.dumps(rec, default=str) + "\n")
 
-    def append_trade(self, rec: dict):
-        p = self.dir / "trades.csv"
+    def append_reconcile(self, rec: dict):
+        with open(self.dir / "reconcile.jsonl", "a") as f:
+            f.write(json.dumps(rec, default=str) + "\n")
+
+    def append_trade(self, rec: dict, name: str = "trades.csv"):
+        p = self.dir / name
         new = not p.exists()
         with open(p, "a", newline="") as f:
             w = csv.DictWriter(f, fieldnames=list(rec))
@@ -114,6 +127,12 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
     today_str = str(pd.Timestamp.now(tz="America/New_York").date())
     if not force and store.data.get("last_completed_run") == today_str:
         rec["status"] = "skipped: already completed today"
+        return rec
+    # A run that failed after placing some orders hasn't completed, but its MOC orders are working and not
+    # yet in the ledger: placing again would double them. Even --force doesn't.
+    if any(p["date"] == today_str for p in store.data.get("pending_orders", [])):
+        rec["status"] = "skipped: orders placed today are still waiting for fills"
+        store.append_run(rec)
         return rec
 
     broker = make_broker(cfg)
@@ -156,13 +175,12 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
             raise RuntimeError(f"QQQ moved {day_move:.1%} today (> {risk.max_signal_move:.0%}); review manually")
 
         prices = {sym: quotes[sym] for sym in (s.long_symbol, s.short_symbol)}
-        positions = broker.positions()
+        # The bucket owns only its ledger's shares and cash (ledger.py), never the account's positions:
+        # other buckets may trade the same symbols in the same account.
+        positions = bucket_positions(cfg, store, broker, set(prices), rec)
         held_value = sum(positions.get(k, 0) * prices[k] for k in prices)
         netliq = broker.net_liquidation()
-        # The strategy keeps its own cash ledger so it can share an account with other holdings:
-        # equity = ledger cash + TQQQ/SQQQ value, seeded from risk.capital on the first run.
-        cash = store.data.setdefault("strategy_cash", risk.capital - held_value)
-        strat_equity = cash + held_value
+        strat_equity = store.data["strategy_cash"] + held_value
         capital = min(strat_equity, netliq)
         peak = max(store.data.get("equity_peak", strat_equity), strat_equity)
         store.data["equity_peak"] = peak
@@ -176,6 +194,7 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
         otype = "MOC" if use_moc and mtc is not None and mtc > MOC_CUTOFF_MIN + 1 else "MKT"
         orders = plan_orders(targets, positions, prices, capital, s.rebalance_band, otype)
         for o in orders:
+            o.ref = cfg.bucket
             if o.quantity * prices[o.symbol] > risk.max_order_value:
                 raise RuntimeError(f"Order {o} exceeds max_order_value {risk.max_order_value}")
 
@@ -191,9 +210,13 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
         )
         armed = cfg.broker.name == "paper" or (live and cfg.broker.live_trading_enabled)
         for o in orders:
+            if armed:  # pending before it is sent: if sending fails half way, the order may still be working
+                ledger.record_pending(store.data, [o], today.date(), ["sending"])
+                store.save()
             result = broker.place(o) if armed else "DRY-RUN"
-            if armed:  # ledger uses the reference price; MOC slippage makes it a close approximation
-                store.data["strategy_cash"] -= o.signed_qty * prices[o.symbol]
+            if armed:
+                store.data["pending_orders"][-1]["result"] = result
+                store.save()
             store.append_trade(
                 {
                     "ts": rec["ts"],
@@ -208,6 +231,10 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
                 }
             )
             log.info("%s %s %d %s -> %s", o.side, o.symbol, o.quantity, o.order_type, result)
+        # Market orders (and the local paper broker) fill at once: credit them now. MOC orders fill at the
+        # close and are credited by the post-close reconcile.
+        if armed and any(o.order_type == "MKT" for o in orders) or (armed and orders and cfg.broker.name == "paper"):
+            settle_fills(store, broker.fills(cfg.bucket), today.date(), after_close=False)
         rec["status"] = ("executed" if armed else "dry-run") if orders else "no change"
         if armed:
             store.data["last_completed_run"] = today_str
@@ -218,4 +245,74 @@ def run_once(cfg: Config, live: bool = False, force: bool = False) -> dict:
         broker.disconnect()
         store.save()
         store.append_run(rec)
+    return rec
+
+
+def bucket_positions(cfg: Config, store: StateStore, broker, symbols: set[str], rec: dict) -> dict[str, int]:
+    """This bucket's shares, after checking that every bucket's ledger on the account adds up to what the
+    account holds. A bucket from before ledgers is seeded once from the account; a new one starts with
+    risk.capital in cash and no shares. Raises ledger.LedgerError instead of trading on doubtful shares."""
+    data = store.data
+    if not getattr(broker, "reports_fills", False):
+        raise ledger.LedgerError(f"{broker.name} can't report fills, so this bucket's shares can't be tracked")
+    data["bucket"], data["account_group"] = cfg.bucket, cfg.account_group
+    today = pd.Timestamp.now(tz="America/New_York").date()
+    stale = ledger.stale_pending(data, today)
+    if stale:
+        raise ledger.LedgerError(
+            f"orders from an earlier day were never matched to fills ({stale}); IB reports only the current "
+            "day's executions, so check them in IBKR and fix the ledger (docs/BUCKETS.md)"
+        )
+    account = broker.positions()
+    if "positions" not in data:
+        if "strategy_cash" in data:
+            ledger.seed_from_broker(Path(cfg.state_dir), data, account, symbols)
+            rec["ledger_seeded"] = dict(data["positions"])
+        else:
+            data["positions"], data["strategy_cash"] = {}, cfg.risk.capital
+    ledger.check_account(Path(cfg.state_dir), cfg.account_group, account, symbols, data, today, cfg.risk.account_check)
+    return ledger.positions(data)
+
+
+def settle_fills(store: StateStore, fills, today, after_close: bool) -> dict:
+    """Apply the bucket's new fills to its ledger and drop pending orders that are finished."""
+    new = ledger.apply_fills(store.data, fills)
+    done = ledger.settle_pending(store.data, fills, today, after_close)
+    for f in new:
+        store.append_trade(vars(f), "fills.csv")
+    store.save()
+    short = [d for d in done if abs(d["filled"]) != d["qty"]]
+    return {"fills": len(new), "settled": len(done), "short_fills": short}
+
+
+def reconcile(cfg: Config) -> dict:
+    """After the close: credit today's fills for this bucket to its ledger. IB reports only the current
+    day's executions, so this runs before the server stops (deploy/server/trading-reconcile.timer)."""
+    store = StateStore(cfg.state_dir)
+    rec: dict = {"ts": datetime.now().isoformat(timespec="seconds"), "bucket": cfg.bucket}
+    if not store.data.get("pending_orders"):
+        rec["status"] = "nothing pending"
+        store.append_reconcile(rec)
+        return rec
+    mtc = minutes_to_close()
+    after_close = mtc is not None and mtc < 0
+    today = pd.Timestamp.now(tz="America/New_York").date()
+    broker = make_broker(cfg)
+    try:  # a failed connection is recorded too, so the dashboard shows it the same evening
+        if isinstance(broker, IBKRBroker):
+            broker.connect(readonly=True, client_id=cfg.broker.ibkr_client_id + 200)
+        else:
+            broker.connect()
+        rec |= settle_fills(store, broker.fills(cfg.bucket), today, after_close)
+        left = store.data.get("pending_orders", [])
+        rec["pending"] = len(left)
+        rec["status"] = "reconciled" + (f", {len(left)} still pending" if left else "")
+        if rec["short_fills"]:
+            rec["status"] += f", {len(rec['short_fills'])} order(s) filled short"
+    except Exception as e:  # noqa: BLE001 - recorded; the next run refuses to trade on unmatched orders
+        rec["status"] = f"error: {e}"
+        log.exception("reconcile failed")
+    finally:
+        broker.disconnect()
+        store.append_reconcile(rec)
     return rec

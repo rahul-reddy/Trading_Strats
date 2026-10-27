@@ -1,0 +1,11 @@
+[Unit]
+Description=tqqq-blend mix-bucket paper runs every 5 minutes from 15:32 to 15:52 ET on weekdays
+
+# Two minutes after the $100k bucket's firings (tqqq-paper.timer), so the two buckets never run at the same
+# moment against the shared account. Each run checks the account against every bucket's ledger first.
+[Timer]
+OnCalendar=Mon..Fri *-*-* 15:32,37,42,47,52:00 America/New_York
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

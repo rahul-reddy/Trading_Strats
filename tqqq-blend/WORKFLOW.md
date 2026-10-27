@@ -76,6 +76,7 @@ python -m tqqq_blend signal --days 10
 | Quarterly | Re-run the backtest with fresh data (`--refresh`) and check nothing drifted | |
 | Emergency | Create the kill-switch file; the next run does nothing | `New-Item state\STOP` |
 | After a drawdown halt | Investigate before clearing `halted` in `state/state.json` | |
+| After a ledger mismatch | The run placed nothing. Find what filled, fix the bucket's ledger, then resume | [docs/BUCKETS.md](../docs/BUCKETS.md) |
 
 ### When to override (and when not to)
 - **Don't** turn it off during a drawdown that is inside the backtest's range (down to about −35%). That is the system working; 2011 and 2018 both looked like this and recovered within a year.

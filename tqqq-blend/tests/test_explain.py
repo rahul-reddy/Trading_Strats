@@ -93,6 +93,7 @@ def test_steady_uptrend_reads_as_a_full_uptrend():
 
 class FakeBroker:
     name = "ibkr"
+    reports_fills = True
 
     def __init__(self):
         self.placed = []

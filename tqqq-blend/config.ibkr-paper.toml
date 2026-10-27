@@ -2,7 +2,10 @@
 #   python -m tqqq_blend --config config.ibkr-paper.toml ibkr-check
 #   python -m tqqq_blend --config config.ibkr-paper.toml run --live --force    (manual test outside the window)
 extends = "config.toml"
-state_dir = "state/ibkr-paper"   # its own cash ledger, equity peak, and trade log
+state_dir = "state/ibkr-paper"   # its own ledger (cash and shares), equity peak, and trade log
+bucket = "tqqq-blend/paper"      # order tag; its fills, and only those, are this bucket's shares (ledger.py)
+account_group = "ibkr-paper"     # buckets sharing the IBKR paper account are checked against it together
+label = "Paper"
 
 [risk]
 capital = 100000                 # paper money; the ledger is seeded from this on the first run only
