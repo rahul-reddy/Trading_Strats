@@ -59,6 +59,26 @@ def test_bundle_is_the_commit_not_the_working_tree(repo: Path, tmp_path: Path):
     assert "untracked.py" not in names and "deploy/push.sh" in names
 
 
+def test_other_strategies_ship_under_strategies(repo: Path, tmp_path: Path):
+    (repo / "sleeves" / "deploy").mkdir(parents=True)
+    script = b"#!/usr/bin/env bash\nset -euo pipefail\n"
+    (repo / "sleeves" / "deploy" / "Dockerfile").write_bytes(b"FROM python:3.12-slim\n")
+    (repo / "sleeves" / "run.sh").write_bytes(script)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "sleeves")
+    git(repo, "push", "-q", "origin", "HEAD:main")
+    (repo / "sleeves" / "untracked.py").write_text("print('not merged')\n")
+    subprocess.run(["git", "config", "core.autocrlf", "true"], cwd=repo, check=True)
+    out = tmp_path / "bundle.tgz"
+    result = bundle(repo, "origin/main", out)
+    assert result.returncode == 0, result.stderr
+    with tarfile.open(out) as tar:
+        names = set(tar.getnames())
+        assert tar.extractfile("strategies/sleeves/run.sh").read() == script  # LF kept despite autocrlf
+    assert {"config.toml", "deploy/push.sh", "strategies/sleeves/deploy/Dockerfile"} <= names
+    assert "strategies/sleeves/untracked.py" not in names
+
+
 def test_commit_not_on_main_is_refused(repo: Path, tmp_path: Path):
     git(repo, "checkout", "-q", "-b", "feat/unmerged")
     (repo / "tqqq-blend" / "config.toml").write_text("capital = 1000000\n")

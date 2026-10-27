@@ -5,6 +5,9 @@ Systematic trading strategies, one folder per strategy. Each folder is self-cont
 | Strategy | What it trades | Status | Start here |
 |---|---|---|---|
 | [tqqq-blend](tqqq-blend/) | TQQQ / SQQQ, one decision a day near the close. Blends Mallik's trend and mean-reversion systems with Vibha Jha's market timing. | v2, paper-trading stage | [WORKFLOW.md](tqqq-blend/WORKFLOW.md) |
+| [sleeves](sleeves/) | Three monthly buckets: ETF rotation (12 asset-class ETFs), SPDR sector momentum, and cheap-and-profitable S&P 500 stocks. With a 20% tqqq-blend bucket they make the $100k mix paper portfolio. | paper-trading stage | [WORKFLOW.md](sleeves/WORKFLOW.md) |
+
+Several strategies can share one broker account as separate **buckets**, each with its own capital and ledger; see [docs/BUCKETS.md](docs/BUCKETS.md).
 
 ## Adding a strategy
 

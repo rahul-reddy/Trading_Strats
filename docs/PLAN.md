@@ -13,7 +13,8 @@ second AI model before it merges.
 | Strategy | Stage | Notes |
 |---|---|---|
 | tqqq-blend | 3. Broker paper (IBKR paper, $100k strategy capital) since 2026-10-20 | Live account: dry runs once the new IBKR user is approved |
-| Mix portfolio ($100k paper, 2026-10-26) | 3. Broker paper (planned) | 20% tqqq-blend (`config.aws-paper-mix.toml`), 30% ETF rotation, 25% sector momentum, 25% quality-value (sleeves/, next PR); each slice is its own bucket |
+| sleeves (ETF rotation, sector momentum, quality-value) | 3. Broker paper from 2026-10-30 (first month-end) | Each its own bucket: $30k / $25k / $25k |
+| Mix portfolio ($100k paper, 2026-10-26) | 3. Broker paper | 20% tqqq-blend (`config.aws-paper-mix.toml`) + the three sleeves buckets; combined on the dashboard |
 
 Stages are defined in tqqq-blend/README.md ("Going live in stages"): backtest, local paper, broker
 paper (4+ weeks), live small (3+ months), scale.

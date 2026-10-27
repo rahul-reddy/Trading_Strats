@@ -60,6 +60,10 @@ printf 'BUCKET=%s\nDASHBOARD_APP_ID=%s\n' "$BUCKET" "$DASHBOARD_APP_ID" > /etc/t
 
 # Strategy image, then for each account with a login: its gateway and its timer
 docker build -q -f "$APP/deploy/Dockerfile" -t tqqq-blend:latest "$APP"   # compose build needs buildx, which AL2023 lacks
+SLEEVES=$APP/strategies/sleeves           # push.sh ships the other strategies on this server under strategies/
+if [ -f "$SLEEVES/deploy/Dockerfile" ]; then
+  docker build -q -f "$SLEEVES/deploy/Dockerfile" -t sleeves:latest "$SLEEVES"
+fi
 cp "$APP"/deploy/server/*.service "$APP"/deploy/server/*.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now trading-backup.timer
@@ -76,14 +80,15 @@ for acct in paper live; do
     systemctl enable --now tqqq-$acct.timer
     # paper also runs the mix bucket and the post-close reconcile of the paper buckets' fills
     [ $acct = live ] || systemctl enable --now tqqq-paper-mix.timer trading-reconcile.timer
+    if [ $acct = paper ] && [ -f "$SLEEVES/deploy/Dockerfile" ]; then systemctl enable --now sleeves-paper.timer; fi
   else
     docker compose --profile $acct rm -sf ibgw-$acct >/dev/null 2>&1 || true
     systemctl disable --now tqqq-$acct.timer 2>/dev/null || true
-    [ $acct = live ] || systemctl disable --now tqqq-paper-mix.timer trading-reconcile.timer 2>/dev/null || true
+    [ $acct = live ] || systemctl disable --now tqqq-paper-mix.timer trading-reconcile.timer sleeves-paper.timer 2>/dev/null || true
     echo "No $acct login in SSM: $acct gateway and timer are off."
   fi
 done
 
 docker image prune -f >/dev/null
 echo "Installed. Gateways:"; docker ps --format '  {{.Names}}  {{.Status}}'
-echo "Timers:"; systemctl list-timers 'tqqq-*' 'trading-*' --no-pager
+echo "Timers:"; systemctl list-timers 'tqqq-*' 'trading-*' 'sleeves-*' --no-pager

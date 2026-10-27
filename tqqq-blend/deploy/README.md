@@ -16,6 +16,8 @@ stopped too) and ~$0.20 for the public IP. Running it all the time would cost ab
 ~15:02 IBKR Mobile push for the live account -> approve it
 15:30  first run: paper places orders, live logs the orders it would place (dry run)
 15:32  the mix portfolio's 20% bucket runs (every 5 minutes to 15:52, two minutes after the $100k bucket)
+15:34  the sleeves buckets (rotation, sectors, quality) run one after another (also 15:39, 15:44, 15:49);
+       they value themselves daily and trade only at a month-end
 15:50  last run of the window (runs after the first successful one do nothing)
 16:10  reconcile: each paper bucket's fills are credited to its own ledger (docs/BUCKETS.md)
 16:30  state (ledgers, trade logs) is copied to S3
@@ -52,6 +54,7 @@ deploy/
   server/*.service, *.timer     paper runs (orders on), live runs (dry run), post-close reconcile, state backup,
                                 dashboard
   server/reconcile.sh           credits each paper bucket's fills to its ledger after the close
+  server/sleeves-paper.sh       runs the three sleeves buckets one after another (sleeves-paper.timer)
   server/publish-dashboard.sh   builds the dashboard page and uploads it to Amplify, only behind the password
 ```
 
@@ -59,6 +62,11 @@ deploy/
 |---|---|---|---|
 | Paper | `ibgw-paper` | `config.aws-paper.toml` -> `config.ibkr-paper.toml` | on |
 | Paper, mix 20% bucket | `ibgw-paper` | `config.aws-paper-mix.toml` -> `config.aws-paper.toml` | on |
+| Paper, sleeves buckets | `ibgw-paper` | `sleeves/config.aws-paper-{rotation,sectors,quality}.toml` (image `sleeves`) | on |
+
+`push.sh` ships the other strategies that run on this server inside the same bundle, under
+`strategies/<name>/`; `install.sh` builds their images. The dashboard shows every bucket and the mix
+portfolio (`--buckets`, `--portfolio` in `docker-compose.yml`).
 | Live | `ibgw-live` | `config.aws-live.toml` -> `config.ibkr-live.toml` | off (dry run, logs the plan) |
 
 ## First-time setup

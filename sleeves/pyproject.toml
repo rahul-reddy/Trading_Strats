@@ -1,0 +1,45 @@
+[project]
+name = "sleeves"
+version = "1.0.0"
+description = "Monthly ETF rotation, SPDR sector momentum and quality-value stock buckets, traded near the close"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=3.0",
+    "numpy>=2.0",
+    "yfinance>=1.0",
+    "pandas_market_calendars>=5.0",
+    "tzdata",
+    "ib_async>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+    "pytest-cov>=7.0",
+    "ruff>=0.14",
+    "mypy>=1.18",
+    "pandas-stubs",
+    "pip-audit",
+]
+
+[tool.uv]
+package = false   # an application run with `python -m sleeves`, not a library
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["state"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["sleeves"]
+ignore_missing_imports = true   # ib_async, yfinance and pandas_market_calendars ship no usable stubs
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q -p no:cacheprovider"

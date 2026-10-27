@@ -1,0 +1,17 @@
+# The mix portfolio's 25% slice: quality-value (STRATEGY.md), its own bucket in the IBKR paper account.
+#   docker compose run --rm sleeves-quality run --live     (from tqqq-blend/deploy; what the sleeves timer runs)
+extends = "config.aws-paper.toml"
+state_dir = "state/sleeves-quality-paper"
+bucket = "sleeves/quality-paper"
+label = "Paper · mix 25% · quality-value"
+
+[sleeve]
+kind = "quality"
+
+[risk]
+capital = 25000                  # owner, 2026-10-26: "another $100k in my paper portfolio", split 20-30-25-25
+max_order_value = 26000          # moving the whole bucket into T-bills is one order of about its capital
+max_drawdown_halt = 0.50
+
+[broker]
+ibkr_client_id = 23               # its own API client, never shared with another bucket's runs

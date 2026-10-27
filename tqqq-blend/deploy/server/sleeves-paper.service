@@ -1,0 +1,9 @@
+[Unit]
+Description=sleeves near-close runs: the mix portfolio's rotation, sector and quality buckets, IBKR paper
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/trading/app/deploy
+ExecStart=/bin/bash /opt/trading/app/deploy/server/sleeves-paper.sh

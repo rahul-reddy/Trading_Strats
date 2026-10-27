@@ -6,7 +6,11 @@
 set -uo pipefail
 cd /opt/trading/app/deploy
 status=0
-for svc in tqqq-paper tqqq-paper-mix; do
+services="tqqq-paper tqqq-paper-mix"
+if docker image inspect sleeves:latest >/dev/null 2>&1; then
+  services="$services sleeves-rotation sleeves-sectors sleeves-quality"
+fi
+for svc in $services; do
   echo "== $svc"
   /usr/bin/docker compose run --rm "$svc" reconcile || status=1
 done

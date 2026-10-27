@@ -2,30 +2,40 @@
 
 ## Current handoff (2026-10-26)
 
-**In progress:** buckets (branch `feat/buckets`, PR 1 of 2) for the owner's second $100k paper portfolio, split
-20% tqqq-blend / 30% ETF rotation / 25% SPDR sector momentum / 25% quality-value, each slice its own bucket in the
-shared IBKR paper account and on the dashboard (docs/BUCKETS.md). PR 1: tqqq-blend buckets own only the shares
-their own fills bought (orderRef-tagged, reconciled at 16:10 ET, checked against the whole account before each
-trade); the $20k mix bucket (`config.aws-paper-mix.toml`); reconcile alerts on the dashboard. PR 2: `sleeves/`
-with the other three buckets.
+**Merged:** buckets (#20, 04e0744): tqqq-blend buckets own only the shares their own fills bought (IBKR orderRef,
+reconciled at 16:10 ET, the whole account checked against every bucket's ledger before a trade); the $20k mix
+bucket (`config.aws-paper-mix.toml`); reconcile alerts on the dashboard. Not yet deployed.
 
-**Verified on the feat/buckets working tree (local, Windows):** tqqq-blend `ruff check`, `ruff format --check`,
-`mypy` clean; `pytest` 88 passed with Chromium (runner.py 27% -> 96%, ledger.py 99%, brokers/ibkr.py 0% -> 51%);
-a local paper smoke run of two buckets: the second refused on a mismatched account, then traded in its own group.
+**In review:** sleeves (branch `feat/sleeves`): ETF rotation ($30k), SPDR sector momentum ($25k) and quality-value
+($25k) buckets for the owner's second $100k paper portfolio (20/30/25/25), their deploy (bundled by push.sh under
+`strategies/sleeves`, `sleeves-paper.timer` at 15:34-15:49 ET), and the dashboard's mix-portfolio view and
+holdings buckets. rules/schedule/ledger.py are now critical paths for review tiering.
 
-**Running:** the server still runs `41f8d47`: tqqq-blend on the IBKR paper profile, $100k, Finviz quotes. On the
-first run after this deploys, that bucket seeds its share ledger from the account's TQQQ/SQQQ once.
+**Verified on feat/sleeves (local, Windows):** tqqq-blend `ruff`, `mypy` clean, `pytest` all passed with Chromium
+(incl. portfolio and holdings browser tests, phone width, dark mode); sleeves `ruff`, `mypy` clean, `pytest` 63
+passed; harness self-test passed. Live smoke: `signal` for all three sleeves on real data and Finviz (rotation
+DBC/SPY/QQQ/EFA; sectors XLE/XLK/XLV; quality 19 stocks); a local paper rebalance credited its fills to the ledger.
+Backtests with the live rules: rotation 9.5% CAGR, -18.4% max DD since 2008; sectors 7.9%, -24.8% since 2000; the
+20/30/25/25 mix 11.1%, -17.9% (SPY 11.8%, -46.3%), quality from its CRSP proxy (sleeves/STRATEGY.md).
+
+**Running:** the server still runs `41f8d47`: tqqq-blend paper, $100k.
 
 **Remaining:**
-- PR 1: CI, cross-review, merge, deploy; check the first 15:30 run seeded the ledger and the 16:10 reconcile ran.
-- PR 2: sleeves/ (ETF rotation, sector momentum, quality-value), its backtest, deploy, and the mix view on the
-  dashboard. First rebalance: Friday 2026-10-30 (month end).
-- brokers/schwab.py has no fill reports: a Schwab profile now refuses to trade (none is deployed).
+- sleeves: CI, cross-review, merge; then deploy both merges with deploy/push.sh, and check the first run seeds the
+  $100k bucket's ledger, the mix bucket and the sleeves buckets value themselves, and the 16:10 reconcile runs.
+- First sleeves rebalance: Friday 2026-10-30 (month end). Check orders, fills and the dashboard that evening.
+- Schwab: no fill reports, so a Schwab profile refuses to trade (none is deployed).
 - Live: store the new IBKR live user's login once IBKR approves it, deploy, approve the push, run ibkr-check.
 
-**Next action:** open PR 1, run CI and scripts/cross-review.ps1.
+**Next action:** open the sleeves PR, run CI and scripts/cross-review.ps1, merge, deploy.
 
 ## History
+
+- 2026-10-26: Buckets (#20). The owner asked for a second $100k paper portfolio, 20/30/25/25 across tqqq-blend,
+  ETF rotation, sector momentum and quality-value, each slice tested as its own bucket and shown on the dashboard.
+  Research behind the sleeves: 19-year ETF backtests and CRSP factor data (sleeves/STRATEGY.md). Gemini's review
+  of #20 found three real issues (reconcile exiting 0 on failure, Schwab able to send orders before refusing,
+  stale sibling orders widening the account check), all fixed before merge.
 
 - 2026-10-22: Trade reasons (#17): explain.py turns a day's signal into each sleeve's rule plus the blend
   arithmetic; the runner records it (fenced: a failure can't change a run); the dashboard shows what it did

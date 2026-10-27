@@ -158,6 +158,8 @@ def summarize_profile(cfg: Config, now: pd.Timestamp) -> dict:
     runs, bad_lines = read_runs(state_dir)
     state = json.loads((state_dir / "state.json").read_text()) if (state_dir / "state.json").exists() else {}
     account: dict[str, Any] = {
+        "kind": "tqqq",
+        "state_dir": str(state_dir.resolve()),
         "name": cfg.label or ("Paper" if paper else "Live"),
         "bucket": cfg.bucket,
         "broker": b.name,
@@ -210,35 +212,186 @@ def summarize_profile(cfg: Config, now: pd.Timestamp) -> dict:
             "days": len(series),
         }
 
-    run_dates = {datetime.fromisoformat(r["ts"]).date() for r in runs}
     decision = next((r for r in reversed(runs) if _num(r.get("net")) is not None), None)
-    recent_cutoff = str((now - pd.Timedelta(days=30)).date())
     trades = read_trades(state_dir)
     by_ts = {r["ts"]: r for r in runs}  # a trade carries its run's timestamp
-    account |= {
+    account |= _health(runs, now) | {
         "series": series,
         "metrics": metrics,
-        "last_run": runs[-1],
         "decision": decision,
-        "due_through": str(due_through(now)),
-        "missed_days": missed_days(run_dates, min(run_dates), due_through(now)),
-        "errors_30d": sum(1 for r in runs if str(r.get("status", "")).startswith("error") and r["ts"] >= recent_cutoff),
-        "runs": list(reversed(runs[-RECENT_RUNS:])),
         "trades": [trade_reason(t, by_ts) for t in reversed(trades[-RECENT_TRADES:])],
         "trades_total": len(trades),
     }
     return scrub(account)
 
 
-def build(profiles: list[str], out: str | Path, now: pd.Timestamp | None = None) -> Path:
-    """Write <out>/index.html for these config profiles and return its path."""
-    now = now if now is not None else pd.Timestamp.now(tz="America/New_York")
-    data = {
-        "generated": now.isoformat(timespec="seconds"),
-        "strategies": [
-            {"name": STRATEGY, "accounts": [summarize_profile(load_config(p), now) for p in profiles]},
-        ],
+def _health(runs: list[dict], now: pd.Timestamp) -> dict:
+    """The run-health fields every account card shows, from its run records."""
+    run_dates = {datetime.fromisoformat(r["ts"]).date() for r in runs}
+    recent_cutoff = str((now - pd.Timedelta(days=30)).date())
+    return {
+        "last_run": runs[-1],
+        "due_through": str(due_through(now)),
+        "missed_days": missed_days(run_dates, min(run_dates), due_through(now)),
+        "errors_30d": sum(1 for r in runs if str(r.get("status", "")).startswith("error") and r["ts"] >= recent_cutoff),
+        "runs": list(reversed(runs[-RECENT_RUNS:])),
     }
+
+
+def summarize_bucket(state_dir: Path, now: pd.Timestamp) -> dict:
+    """A bucket from another strategy (sleeves/), read from its state folder only: bucket.json describes it,
+    runs.jsonl and trades.csv hold what it did. Its runs record equity, positions, prices and, at
+    month-ends, the decision with its reasons (sleeves/runner.py)."""
+    meta_path = state_dir / "bucket.json"
+    meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+    runs, bad_lines = read_runs(state_dir)
+    state = json.loads((state_dir / "state.json").read_text()) if (state_dir / "state.json").exists() else {}
+    account: dict[str, Any] = {
+        "kind": "holdings",
+        "state_dir": str(state_dir.resolve()),
+        "strategy": meta.get("strategy", state_dir.name),
+        "name": meta.get("label") or state_dir.name,
+        "bucket": meta.get("bucket"),
+        "mode": meta.get("mode", "paper"),
+        "capital": _num(meta.get("capital")),
+        "halt_drawdown": _num(meta.get("halt_drawdown")),
+        "rebalance_band": _num(meta.get("rebalance_band")),
+        "symbols": {"benchmark": meta.get("benchmark", "SPY"), "cash": meta.get("cash_symbol", "SGOV")},
+        "kill_switch": (state_dir / "STOP").exists(),
+        "halted": state.get("halted"),
+        "unreadable_run_lines": bad_lines,
+        "reconcile": last_reconcile(state_dir),
+        "runs_total": len(runs),
+        "missing_meta": not meta,
+    }
+    if not runs:
+        return scrub(account | {"series": [], "runs": [], "trades": [], "missed_days": [], "metrics": None})
+    by_day: dict[str, dict] = {}
+    for r in runs:
+        if _num(r.get("equity")) is not None:
+            by_day[r["ts"][:10]] = r
+    series: list[dict[str, Any]] = [
+        {"date": d, "equity": _num(r["equity"]), "peak": _num(r.get("peak")), "bench": _num(r.get("benchmark_price"))}
+        for d, r in sorted(by_day.items())
+    ]
+    metrics = None
+    if series:
+        eq: list[float] = [p["equity"] for p in series]
+        last_peak = max(max(eq), series[-1]["peak"] or 0)
+        metrics = {
+            "equity": eq[-1],
+            "start_equity": eq[0],
+            "start_date": series[0]["date"],
+            "return": eq[-1] / eq[0] - 1 if eq[0] else None,
+            "bench_return": _return(series, "bench"),
+            "drawdown": eq[-1] / last_peak - 1 if last_peak else None,
+            "max_drawdown": _max_drawdown(eq),
+            "days": len(series),
+        }
+    valued = next((r for r in reversed(runs) if _num(r.get("equity")) is not None), None)
+    holdings: list[dict[str, Any]] = []
+    if valued:
+        prices = valued.get("prices") or {}
+        for sym, qty in sorted((valued.get("positions") or {}).items()):
+            px = _num(prices.get(sym))
+            holdings.append({"symbol": sym, "shares": qty, "price": px, "value": qty * px if px is not None else None})
+        holdings.append({"symbol": "Cash", "shares": None, "price": None, "value": _num(valued.get("cash"))})
+        total = _num(valued.get("equity"))
+        for h in holdings:
+            h["weight"] = h["value"] / total if total and h["value"] is not None else None
+    trades = read_trades(state_dir)
+    account |= _health(runs, now) | {
+        "series": series,
+        "metrics": metrics,
+        "holdings": holdings,
+        "holdings_ts": valued["ts"] if valued else None,
+        "decision": next((r for r in reversed(runs) if r.get("why")), None),
+        "next_check": runs[-1].get("schedule"),
+        "trades": list(reversed(trades[-RECENT_TRADES:])),
+        "trades_total": len(trades),
+    }
+    return scrub(account)
+
+
+def portfolio(name: str, members: list[dict]) -> dict:
+    """Several buckets read as one portfolio: each day's value is the sum of every member's latest equity on
+    or before that day (its capital before its first valued run). The benchmark is the first member that
+    records one that day."""
+    dates = sorted({p["date"] for m in members for p in m.get("series", [])})
+    series = []
+    for d in dates:
+        total, bench = 0.0, None
+        for m in members:
+            pts = [p for p in m.get("series", []) if p["date"] <= d and p["equity"] is not None]
+            total += pts[-1]["equity"] if pts else (m.get("capital") or 0.0)
+        for m in members:
+            same = [p for p in m.get("series", []) if p["date"] == d and p.get("bench") is not None]
+            if same:
+                bench = same[-1]["bench"]
+                break
+        series.append({"date": d, "equity": total, "bench": bench})
+    capital = sum(m.get("capital") or 0.0 for m in members)
+    rows = []
+    for m in members:
+        mm = m.get("metrics") or {}
+        rows.append(
+            {
+                "name": m["name"],
+                "id": m.get("_id"),
+                "capital": m.get("capital"),
+                "target": (m.get("capital") or 0.0) / capital if capital else None,
+                "value": mm.get("equity", m.get("capital")),
+                "return": mm.get("return"),
+            }
+        )
+    total = sum(r["value"] or 0.0 for r in rows)
+    for r in rows:
+        r["weight"] = (r["value"] or 0.0) / total if total else None
+    metrics = None
+    if series:
+        eq = [p["equity"] for p in series]
+        metrics = {
+            "equity": eq[-1],
+            "capital": capital,
+            "start_date": series[0]["date"],
+            "return": eq[-1] / capital - 1 if capital else None,
+            "bench_return": _return(series, "bench"),
+            "drawdown": eq[-1] / max(eq) - 1 if max(eq) else None,
+            "max_drawdown": _max_drawdown(eq),
+        }
+    return {"name": name, "series": series, "members": rows, "metrics": metrics}
+
+
+def build(
+    profiles: list[str],
+    out: str | Path,
+    now: pd.Timestamp | None = None,
+    buckets: list[str] | None = None,
+    portfolios: list[list[str]] | None = None,
+) -> Path:
+    """Write <out>/index.html for these config profiles, other strategies' bucket folders, and portfolios
+    (each a name followed by its members' state folders), and return its path."""
+    now = now if now is not None else pd.Timestamp.now(tz="America/New_York")
+    strategies: list[dict[str, Any]] = [
+        {"name": STRATEGY, "accounts": [summarize_profile(load_config(p), now) for p in profiles]}
+    ]
+    others: dict[str, list[dict]] = {}
+    for b in buckets or []:
+        acct = summarize_bucket(Path(b), now)
+        others.setdefault(acct["strategy"], []).append(acct)
+    strategies += [{"name": k, "accounts": v} for k, v in others.items()]
+    for si, strat in enumerate(strategies):
+        for ai, a in enumerate(strat["accounts"]):
+            a["_id"] = f"acct-{si}-{ai}"
+    by_dir = {a["state_dir"]: a for s in strategies for a in s["accounts"]}
+    folios = []
+    for spec in portfolios or []:
+        name, dirs = spec[0], spec[1:]
+        found = [by_dir.get(str(Path(d).resolve())) for d in dirs]
+        folio = portfolio(name, [a for a in found if a is not None])
+        folio["missing"] = [d for d, a in zip(dirs, found, strict=True) if a is None]  # named, never dropped
+        folios.append(scrub(folio))
+    data = {"generated": now.isoformat(timespec="seconds"), "portfolios": folios, "strategies": strategies}
     # No "<" at all inside the JSON (< decodes to the same text), so no recorded string can close the
     # <script> element or open a comment that changes how the browser parses it.
     payload = json.dumps(data, default=str, allow_nan=False).replace("<", "\\u003c")

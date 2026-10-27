@@ -29,6 +29,8 @@ class PaperBroker:
         self.acct.setdefault("fills", [])
 
     def disconnect(self):
+        if self.acct is None:  # connect() failed: never overwrite the account file with nothing
+            return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(self.acct, indent=2))
 

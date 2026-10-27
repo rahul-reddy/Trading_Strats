@@ -43,6 +43,15 @@ def main():
     d = sub.add_parser("dashboard")
     profiles = ["config.ibkr-paper.toml", "config.aws-paper-mix.toml", "config.ibkr-live.toml"]
     d.add_argument("--profiles", nargs="+", default=profiles)
+    d.add_argument("--buckets", nargs="*", default=[], help="state folders of other strategies' buckets (sleeves/)")
+    d.add_argument(
+        "--portfolio",
+        nargs="+",
+        action="append",
+        default=[],
+        metavar="NAME_OR_DIR",
+        help="a portfolio: its name, then the state folders of its buckets (repeatable)",
+    )
     d.add_argument("--out", default="state/dashboard")
     args = ap.parse_args()
 
@@ -151,7 +160,7 @@ def main():
     elif args.cmd == "dashboard":
         from .dashboard import build
 
-        print("Wrote", build(args.profiles, args.out))
+        print("Wrote", build(args.profiles, args.out, buckets=args.buckets, portfolios=args.portfolio))
 
 
 if __name__ == "__main__":

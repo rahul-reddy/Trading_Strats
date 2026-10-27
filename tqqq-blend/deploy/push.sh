@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploys a merged revision of tqqq-blend to the trading server:
+# Deploys a merged revision of tqqq-blend (and the other strategies that run on its server) to the server:
 # git archive -> S3 -> SSM Run Command -> server/install.sh. Manual on purpose; nothing deploys on merge.
 # Run from Git Bash on your PC (or any bash with git and the AWS CLI), from anywhere:
 #
@@ -35,7 +35,26 @@ SHORT=${SHA:0:7}
 # Line-ending conversion is off: archiving the tqqq-blend subtree loses the root .gitattributes
 # (which keep *.sh LF), so core.autocrlf=true on Windows wrote CRLF into every script and bash
 # on the server failed on `set -o pipefail\r`. The bundle is the committed bytes, which are LF.
-archive() { (cd "$(git rev-parse --show-toplevel)" && git -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz "$SHA:tqqq-blend"); }
+# Strategies that run on this server next to tqqq-blend ship inside the bundle under strategies/<name>/
+# (install.sh builds their images); each is the committed tree at $SHA too.
+EXTRA_STRATEGIES="sleeves"
+archive() {
+  (
+    cd "$(git rev-parse --show-toplevel)"
+    local tmp
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT  # this subshell's own trap: the temp dir goes when it ends
+    g() { git -c core.autocrlf=false -c core.eol=lf "$@"; }
+    g archive --format=tar "$SHA:tqqq-blend" > "$tmp/bundle.tar"  # a redirect: git.exe cannot open MSYS /tmp paths
+    for s in $EXTRA_STRATEGIES; do
+      if git cat-file -e "$SHA:$s" 2>/dev/null; then
+        g archive --format=tar --prefix="strategies/$s/" "$SHA:$s" > "$tmp/$s.tar"
+        tar -A -f "$tmp/bundle.tar" "$tmp/$s.tar"
+      fi
+    done
+    gzip -c "$tmp/bundle.tar"
+  )
+}
 if [ -n "$BUNDLE_ONLY" ]; then
   archive > "$BUNDLE_ONLY"
   exit 0

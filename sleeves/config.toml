@@ -1,0 +1,16 @@
+# Local defaults: the local paper broker (simulated fills), one bucket. Overrides for sleeves/config.py.
+#   uv run python -m sleeves signal                    # what the rules hold today
+#   uv run python -m sleeves run --force --check-now   # a full local paper run, deciding today
+state_dir = "state/local"
+bucket = "sleeves/local"
+
+[sleeve]
+kind = "rotation"            # rotation | sectors | quality
+
+[risk]
+capital = 10000
+
+[broker]
+name = "paper"
+live_trading_enabled = false # second safety: --live does nothing unless this is true
+quote_source = "finviz"      # real-time Finviz Elite quotes (env FINVIZ_TOKEN); falls back to the broker

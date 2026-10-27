@@ -143,6 +143,13 @@ a.ov:hover { border-color: var(--axis); transform: translateY(-1px); }
 
 /* KPIs */
 .kpis { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+.kpis.k4 { grid-template-columns: 1.6fr repeat(3, 1fr); }
+.portfolio { margin-bottom: 36px; scroll-margin-top: 16px; }
+.reasons { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.reasons li { display: grid; grid-template-columns: 64px 44px 1fr; gap: 8px; align-items: baseline; }
+.reasons .sym { font-weight: 650; }
+.reasons .w { font-variant-numeric: tabular-nums; color: var(--ink-2); text-align: right; }
+.reasons .t { color: var(--ink-2); line-height: 1.45; }
 .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 14px 16px; min-width: 0; }
 .kpi .label { color: var(--ink-2); font-size: 12.5px; }
 .kpi .v { font-size: 22px; font-weight: 650; margin-top: 2px; letter-spacing: -0.01em; }
@@ -1027,22 +1034,189 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
     return sec;
   }
 
+
+  // ---- buckets from other strategies (sleeves): holdings, monthly decision ----
+  function dayChange(ser) {
+    return ser.length >= 2 && isNum(ser[ser.length - 1].equity) && isNum(ser[ser.length - 2].equity) && ser[ser.length - 2].equity
+      ? ser[ser.length - 1].equity / ser[ser.length - 2].equity - 1 : null;
+  }
+  function vsText(ret, bench) {
+    if (!isNum(ret) || !isNum(bench)) return null;
+    const d = (ret - bench) * 100;
+    return (d >= 0 ? "Ahead by " : "Behind by ") + Math.abs(d).toFixed(1) + " pts";
+  }
+  function meterFor(dd, halt) {
+    const used = isNum(dd) && halt ? Math.min(1, Math.abs(dd) / halt) : 0;
+    const meter = el("div", { class: "meter", role: "img", "aria-label": pct(used, 0) + " of the way to the drawdown halt" });
+    const fill = el("span");
+    fill.style.width = Math.max(used * 100, used > 0 ? 2 : 0) + "%";
+    fill.style.background = used < 0.33 ? "var(--good)" : used < 0.66 ? "var(--warning)" : "var(--critical)";
+    meter.append(fill);
+    return meter;
+  }
+  function kpisHoldings(a) {
+    const m = a.metrics, b = a.symbols.benchmark, day = dayChange(a.series || []);
+    return el("div", { class: "kpis k4" }, [
+      el("div", { class: "kpi hero" }, [
+        el("div", { class: "label", text: "Bucket equity" }),
+        el("div", { class: "v", text: money(m.equity) }),
+        el("div", { class: "deltas" }, [
+          el("span", null, [el("span", { class: "lbl", text: "Last day " }), el("span", { class: dirClass(day), text: pct(day, 2, true) })]),
+          el("span", null, [el("span", { class: "lbl", text: "Since " + shortDate(m.start_date) + " " }), el("span", { class: dirClass(m.return), text: pct(m.return, 2, true) })]),
+        ]),
+        el("div", { class: "note", text: "Allotted " + money(a.capital) }),
+      ]),
+      kpi(b + " buy and hold", pct(m.bench_return, 2, true), vsText(m.return, m.bench_return)),
+      kpi("Drawdown from peak", pct(m.drawdown, 1), "Worst " + pct(m.max_drawdown, 1) + (a.halt_drawdown ? " · halts at " + pct(-a.halt_drawdown, 0) : ""), meterFor(m.drawdown, a.halt_drawdown)),
+      kpi("Trades", String(a.trades_total || 0), m.days + " trading days · " + a.runs_total + " runs"),
+    ]);
+  }
+  function growthAndDrawdown(ser, benchName, halt, label) {
+    const dates = ser.map(function (p) { return p.date; });
+    const idx = function (key) {
+      const first = ser.find(function (p) { return isNum(p[key]) && p[key] > 0; });
+      return ser.map(function (p) { return first && isNum(p[key]) ? (p[key] / first[key]) * 100 : null; });
+    };
+    let peak = -Infinity;
+    const dd = ser.map(function (p) { if (!isNum(p.equity)) return null; peak = Math.max(peak, p.equity); return peak > 0 ? p.equity / peak - 1 : null; });
+    const growth = chart({ label: "Growth of $100", dates: dates, baseline: 100, endLabels: true, height: 240,
+      series: [{ name: label, short: label, color: "var(--series-1)", values: idx("equity") },
+               { name: benchName + " buy and hold", short: benchName, color: "var(--series-2)", values: idx("bench") }],
+      yFmt: function (v) { return isNum(v) ? "$" + v.toFixed(0) : "—"; }, tipFmt: function (v) { return isNum(v) ? "$" + v.toFixed(2) : "—"; } });
+    const ddOpts = { label: "Drawdown from peak", dates: dates, height: 150, zero: true, clampMax: 0,
+      series: [{ name: "Drawdown", color: "var(--series-1)", values: dd, area: true }],
+      yFmt: function (v) { return pct(v, 0); }, tipFmt: function (v) { return pct(v, 1); } };
+    if (halt) ddOpts.refLine = { y: -halt, label: "Halt " + pct(-halt, 0) };
+    const perf = el("section", { class: "card", "aria-label": "Performance" }, [
+      el("div", { class: "card-head" }, [el("div", null, [el("h3", { text: "Growth of $100" }), el("div", { class: "card-sub", text: "Against " + benchName + " buy and hold over the same days" })])]),
+      legend([{ name: label, color: "var(--series-1)", line: true }, { name: benchName + " buy and hold", color: "var(--series-2)", line: true }]), growth]);
+    const ddCard = el("section", { class: "card", "aria-label": "Drawdown" }, [el("div", { class: "card-head" }, [el("h3", { text: "Drawdown from peak" })]), chart(ddOpts)]);
+    return el("div", { class: "stack" }, [perf, ddCard]);
+  }
+  function holdingsCard(a) {
+    const card = el("section", { class: "card", "aria-label": "Holdings" });
+    card.append(el("div", { class: "card-head" }, [el("h3", { text: "Holdings" }), el("span", { class: "card-sub", text: "as of " + fmtTime(a.holdings_ts) })]));
+    const rows = (a.holdings || []).map(function (h) {
+      return [h.symbol, h.shares == null ? "—" : String(h.shares), money(h.value), pct(h.weight, 1)];
+    });
+    card.append(rows.length ? table([["Symbol"], ["Shares", "num"], ["Value", "num"], ["Weight", "num"]], rows)
+      : el("div", { class: "empty", text: "Nothing held yet." }));
+    if (a.next_check) card.append(el("div", { class: "foot" }, [el("span", { text: "Schedule: " + a.next_check })]));
+    return card;
+  }
+  function decisionHoldings(a) {
+    const d = a.decision;
+    const card = el("section", { class: "card decision", "aria-label": "Latest decision" });
+    if (!d) {
+      card.append(el("div", { class: "card-head" }, [el("h3", { text: "Latest decision" })]));
+      card.append(el("div", { class: "empty", text: "No month-end decision yet. " + (a.next_check || "") }));
+      return card;
+    }
+    card.append(el("div", { class: "card-head" }, [
+      el("h3", { text: "Latest decision" }),
+      el("span", { class: "status card-sub" }, [statusDot(d.status), el("span", { text: fmtTime(d.ts) + " · " + (d.status || "—") })]),
+    ]));
+    card.append(el("div", { class: "target", text: d.why.summary || "—" }));
+    if (d.why.decision) card.append(el("div", { class: "card-sub", text: "Decision: " + d.why.decision }));
+    const orders = d.orders || [];
+    card.append(el("div", { class: "section-label", text: "What it did" }));
+    const list = el("ul", { class: "orders", "aria-label": "Orders" });
+    orders.forEach(function (o) {
+      list.append(el("li", { class: "order" }, [el("div", { class: "order-line" }, [
+        el("span", { class: "side " + String(o.side).toLowerCase(), text: o.side }),
+        el("span", { text: o.quantity + " " + o.symbol }),
+        el("span", { class: "card-sub", text: o.order_type === "MOC" ? "market on close" : String(o.order_type || "").toLowerCase() }),
+      ])]));
+    });
+    if (!orders.length) list.append(el("li", { class: "card-sub", text: String(d.status).startsWith("error") ? "No orders: the run stopped before trading." : "No orders: holdings already match the targets." }));
+    card.append(list);
+    card.append(el("div", { class: "section-label", text: "Why" }));
+    const reasons = d.why.reasons || [];
+    card.append(limited(reasons, function (rows) {
+      return el("ul", { class: "reasons" }, rows.map(function (r) {
+        return el("li", null, [el("span", { class: "sym", text: r.symbol }), el("span", { class: "w", text: pct(r.weight, 0) }), el("span", { class: "t", text: r.text })]);
+      }));
+    }));
+    return card;
+  }
+  function holdingsSection(a, st) {
+    const sec = el("section", { class: "account", id: a._id, "data-mode": a.mode, "data-kind": "holdings", "aria-label": a.name + " bucket" });
+    const last = a.last_run;
+    sec.append(el("div", { class: "acct-head" }, [
+      el("h2", { text: a.name }), el("span", { class: "badge", text: MODE[a.mode] || a.mode }), pill(st.level, st.label),
+      el("span", { class: "last", text: "Last run " + fmtTime(last && last.ts) }),
+    ]));
+    if (st.alerts.length) sec.append(el("div", { class: "alerts" }, st.alerts.map(function (al) {
+      return el("div", { class: "alert", role: al[0] === "critical" ? "alert" : null }, [statusIcon(al[0]), el("span", { text: al[1] })]);
+    })));
+    if (st.notes.length) sec.append(el("div", { class: "notes", text: st.notes.join(" ") }));
+    if (a.metrics) {
+      sec.append(kpisHoldings(a));
+      sec.append(el("div", { class: "grid-main" }, [
+        growthAndDrawdown(a.series, a.symbols.benchmark, a.halt_drawdown, "Bucket"),
+        el("div", { class: "stack" }, [holdingsCard(a), decisionHoldings(a)]),
+      ]));
+    } else {
+      sec.append(el("div", { class: "empty", text: "No run has valued this bucket yet." }));
+      sec.append(el("div", { class: "grid-main" }, [decisionHoldings(a), el("div")]));
+    }
+    sec.append(activityCard(a));
+    return sec;
+  }
+
+  // ---- portfolios: several buckets read as one ----
+  function portfolioSection(p, i) {
+    const sec = el("section", { class: "portfolio", id: "portfolio-" + i, "aria-label": p.name });
+    const m = p.metrics;
+    sec.append(el("div", { class: "acct-head" }, [el("h2", { text: p.name }), el("span", { class: "badge", text: "Combined buckets" })]));
+    if (p.missing && p.missing.length) sec.append(el("div", { class: "alerts" }, [el("div", { class: "alert", role: "alert" }, [
+      statusIcon("warning"), el("span", { text: "Not found, so left out of the totals: " + p.missing.join(", ") })])]));
+    if (!m) { sec.append(el("div", { class: "empty", text: "None of its buckets has run yet." })); return sec; }
+    const ser = p.series || [];
+    sec.append(el("div", { class: "kpis k4" }, [
+      el("div", { class: "kpi hero" }, [
+        el("div", { class: "label", text: "Portfolio value" }),
+        el("div", { class: "v", text: money(m.equity) }),
+        el("div", { class: "deltas" }, [
+          el("span", null, [el("span", { class: "lbl", text: "Last day " }), el("span", { class: dirClass(dayChange(ser)), text: pct(dayChange(ser), 2, true) })]),
+          el("span", null, [el("span", { class: "lbl", text: "Since " + shortDate(m.start_date) + " " }), el("span", { class: dirClass(m.return), text: pct(m.return, 2, true) })]),
+        ]),
+        el("div", { class: "note", text: "Allotted " + money(m.capital) + " across " + p.members.length + " buckets" }),
+      ]),
+      kpi("SPY buy and hold", pct(m.bench_return, 2, true), vsText(m.return, m.bench_return)),
+      kpi("Drawdown from peak", pct(m.drawdown, 1), "Worst " + pct(m.max_drawdown, 1)),
+      kpi("Buckets", String(p.members.length), "each with its own capital and ledger"),
+    ]));
+    const rows = p.members.map(function (r) {
+      const name = r.id ? el("a", { href: "#" + r.id, text: r.name }) : r.name;
+      return [name, pct(r.target, 0), money(r.value), pct(r.weight, 1), pct(r.return, 2, true)];
+    });
+    const alloc = el("section", { class: "card", "aria-label": "Allocation" }, [
+      el("div", { class: "card-head" }, [el("h3", { text: "Allocation" }), el("span", { class: "card-sub", text: "Rebalanced only by each bucket's own rules" })]),
+      table([["Bucket", "wide"], ["Target", "num"], ["Value", "num"], ["Now", "num"], ["Return", "num"]], rows)]);
+    sec.append(el("div", { class: "grid-main" }, [growthAndDrawdown(ser, "SPY", null, "Portfolio"), alloc]));
+    return sec;
+  }
+
   // ---- page ----
   document.getElementById("generated").textContent = "Updated " + fmtTime(DATA.generated) + " ET · rebuilt after the close on weekdays";
   const stale = staleBanner();
   if (stale) document.getElementById("stale").append(stale);
   const app = document.getElementById("app"), overview = document.getElementById("overview");
+  if ((DATA.portfolios || []).length) app.append(el("h2", { class: "strategy-title", text: "Portfolios" }));
+  (DATA.portfolios || []).forEach(function (p, i) { app.append(portfolioSection(p, i)); });
   DATA.strategies.forEach(function (strat, si) {
     const withRuns = [];
     strat.accounts.forEach(function (a, ai) {
-      a._id = "acct-" + si + "-" + ai;
+      a._id = a._id || "acct-" + si + "-" + ai;
       const st = assess(a);
+      if (a.missing_meta && a.runs_total) st.alerts.push(["warning", "This bucket has runs but no bucket.json, so its name and limits are unknown."]);
       overview.append(overviewCard(strat.name, a, st));
       if (a.runs_total) withRuns.push([a, st]);
     });
     if (!withRuns.length) return;
     app.append(el("h2", { class: "strategy-title", text: strat.name }));
-    withRuns.forEach(function (x) { app.append(accountSection(strat.name, x[0], x[1])); });
+    withRuns.forEach(function (x) { app.append(x[0].kind === "holdings" ? holdingsSection(x[0], x[1]) : accountSection(strat.name, x[0], x[1])); });
   });
   CHARTS.forEach(draw);
   let pending = false;
