@@ -1,0 +1,17 @@
+# The mix portfolio's 25% slice: sector momentum (STRATEGY.md), its own bucket in the IBKR paper account.
+#   docker compose run --rm sleeves-sectors run --live     (from tqqq-blend/deploy; what the sleeves timer runs)
+extends = "config.aws-paper.toml"
+state_dir = "state/sleeves-sectors-paper"
+bucket = "sleeves/sectors-paper"
+label = "Paper · mix 25% · sector momentum"
+
+[sleeve]
+kind = "sectors"
+
+[risk]
+capital = 25000                  # owner, 2026-10-26: "another $100k in my paper portfolio", split 20-30-25-25
+max_order_value = 26000          # moving the whole bucket into T-bills is one order of about its capital
+max_drawdown_halt = 0.40
+
+[broker]
+ibkr_client_id = 22               # its own API client, never shared with another bucket's runs

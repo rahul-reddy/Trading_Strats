@@ -1,0 +1,12 @@
+[Unit]
+Description=sleeves paper runs at 15:34, 15:39, 15:44 and 15:49 ET on weekdays
+
+# Between the tqqq-blend buckets' firings (15:30/15:32 + 5n), so no two runs start at the same moment
+# against the shared account. Each run values its bucket and trades only at a month-end; once a bucket's
+# run has completed today, later firings do nothing.
+[Timer]
+OnCalendar=Mon..Fri *-*-* 15:34,39,44,49:00 America/New_York
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

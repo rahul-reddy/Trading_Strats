@@ -1,0 +1,13 @@
+# Shared settings for the sleeves buckets in the IBKR paper account on the AWS server. Not a bucket by itself:
+# each config.aws-paper-<sleeve>.toml extends this and sets its own sleeve, capital, state and order tag.
+# The buckets share the account with tqqq-blend's buckets; each owns only its own fills (docs/BUCKETS.md).
+extends = "config.toml"
+account_group = "ibkr-paper"     # the same account as tqqq-blend's paper buckets: checked together
+
+[broker]
+name = "ibkr"
+ibkr_account_type = "paper"      # refuses to trade if the login turns out to be a live account
+ibkr_host = "ibgw-paper"         # Compose service name (tqqq-blend/deploy/docker-compose.yml)
+ibkr_port = 4004                 # the image's relay to Gateway paper
+ibkr_account = ""                # blank = the first account on the login
+live_trading_enabled = true      # paper money, so orders go to the IBKR paper account

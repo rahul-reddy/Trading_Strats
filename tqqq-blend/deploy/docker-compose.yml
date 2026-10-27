@@ -38,6 +38,15 @@ x-job: &job
     FINVIZ_TOKEN: ${FINVIZ_TOKEN:-}              # real-time quotes (quotes.py); from SSM via install.sh
   command: [ "signal" ]
 
+# The sleeves strategy's buckets (../../sleeves, shipped as strategies/sleeves): same state volume, so its
+# ledgers and tqqq-blend's are checked against the shared paper account together (docs/BUCKETS.md).
+x-sleeves: &sleeves
+  image: sleeves:latest
+  profiles: [ jobs ]
+  volumes: [ "/opt/trading/state:/app/state" ]
+  environment:
+    FINVIZ_TOKEN: ${FINVIZ_TOKEN:-}              # quotes and the S&P 500 screen; from SSM via install.sh
+
 services:
   ibgw-paper:
     <<: *gateway
@@ -73,6 +82,18 @@ services:
     <<: *job
     entrypoint: [ "python", "-m", "tqqq_blend", "--config", "config.aws-paper-mix.toml" ]
 
+  sleeves-rotation:
+    <<: *sleeves
+    entrypoint: [ "python", "-m", "sleeves", "--config", "config.aws-paper-rotation.toml" ]
+
+  sleeves-sectors:
+    <<: *sleeves
+    entrypoint: [ "python", "-m", "sleeves", "--config", "config.aws-paper-sectors.toml" ]
+
+  sleeves-quality:
+    <<: *sleeves
+    entrypoint: [ "python", "-m", "sleeves", "--config", "config.aws-paper-quality.toml" ]
+
   tqqq-live:
     <<: *job
     entrypoint: [ "python", "-m", "tqqq_blend", "--config", "config.aws-live.toml" ]
@@ -82,7 +103,11 @@ services:
   dashboard:
     <<: *job
     entrypoint: [ "python", "-m", "tqqq_blend" ]
-    command: [ "dashboard", "--profiles", "config.aws-paper.toml", "config.aws-paper-mix.toml", "config.aws-live.toml", "--out", "state/dashboard" ]
+    command: [ "dashboard", "--profiles", "config.aws-paper.toml", "config.aws-paper-mix.toml", "config.aws-live.toml",
+               "--buckets", "state/sleeves-rotation-paper", "state/sleeves-sectors-paper", "state/sleeves-quality-paper",
+               "--portfolio", "Mix portfolio (paper)", "state/ibkr-paper-mix", "state/sleeves-rotation-paper",
+               "state/sleeves-sectors-paper", "state/sleeves-quality-paper",
+               "--out", "state/dashboard" ]
     network_mode: none
 
 secrets:

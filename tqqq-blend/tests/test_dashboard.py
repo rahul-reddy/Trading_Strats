@@ -4,7 +4,7 @@ from datetime import date
 
 import pandas as pd
 import pytest
-from dashboard_fixture import write_profile, write_state
+from dashboard_fixture import write_bucket, write_profile, write_state
 
 from tqqq_blend.dashboard import build, due_through
 
@@ -171,3 +171,46 @@ def test_unreadable_reconcile_log_is_an_error_not_silence(tmp_path):
     profile = write_profile(tmp_path / "p.toml", "config.ibkr-paper.toml", tmp_path / "paper")
     data = page_data(build([str(profile)], tmp_path / "out", now=NOW).read_text(encoding="utf-8"))
     assert data["strategies"][0]["accounts"][0]["reconcile"]["status"].startswith("error")
+
+
+@pytest.fixture
+def mixed(tmp_path):
+    write_state(tmp_path / "mix", capital=20_000.0)
+    rot = write_bucket(tmp_path / "rot", "rotation", 30_000.0)
+    write_bucket(tmp_path / "sec", "sectors", 25_000.0, start="2026-10-01", seed=12)
+    profile = write_profile(tmp_path / "mix.toml", "config.aws-paper-mix.toml", tmp_path / "mix")
+    dirs = [str(tmp_path / d) for d in ("mix", "rot", "sec", "nowhere")]
+    html = build(
+        [str(profile)], tmp_path / "out", now=NOW, buckets=dirs[1:3], portfolios=[["Mix portfolio", *dirs]]
+    ).read_text(encoding="utf-8")
+    return rot, page_data(html), html
+
+
+def test_holdings_bucket_is_its_own_account(mixed):
+    rot, data, _ = mixed
+    sleeves = next(s for s in data["strategies"] if s["name"] == "sleeves")
+    a = sleeves["accounts"][0]
+    assert a["kind"] == "holdings" and a["name"] == "Paper · mix · rotation" and a["capital"] == 30_000
+    assert a["metrics"]["equity"] == pytest.approx(rot[-1]["equity"])
+    assert a["metrics"]["bench_return"] == pytest.approx(rot[-1]["benchmark_price"] / rot[0]["benchmark_price"] - 1)
+    assert {h["symbol"] for h in a["holdings"]} == {"GLD", "SGOV", "Cash"}
+    assert sum(h["weight"] for h in a["holdings"]) == pytest.approx(1.0)
+    assert a["decision"]["why"]["summary"].startswith("Top 4") and a["trades_total"] == 2
+
+
+def test_portfolio_sums_its_buckets_and_names_missing_ones(mixed):
+    _, data, _ = mixed
+    [p] = data["portfolios"]
+    assert p["missing"] and p["missing"][0].endswith("nowhere")
+    assert [m["capital"] for m in p["members"]] == [20_000, 30_000, 25_000]
+    members = [a for s in data["strategies"] for a in s["accounts"]]
+
+    def value_on(a, d):  # its latest equity on or before d, else its capital (it hadn't run yet)
+        pts = [x["equity"] for x in a["series"] if x["date"] <= d]
+        return pts[-1] if pts else a["capital"]
+
+    for point in (p["series"][0], p["series"][len(p["series"]) // 2], p["series"][-1]):
+        assert point["equity"] == pytest.approx(sum(value_on(a, point["date"]) for a in members))
+    assert p["series"][0]["date"] < "2026-10-01"  # the sectors bucket counts at its capital before its first run
+    assert p["metrics"]["return"] == pytest.approx(p["series"][-1]["equity"] / 75_000 - 1)
+    assert sum(m["weight"] for m in p["members"]) == pytest.approx(1.0)

@@ -1,0 +1,17 @@
+# The mix portfolio's 30% slice: ETF rotation (STRATEGY.md), its own bucket in the IBKR paper account.
+#   docker compose run --rm sleeves-rotation run --live     (from tqqq-blend/deploy; what the sleeves timer runs)
+extends = "config.aws-paper.toml"
+state_dir = "state/sleeves-rotation-paper"
+bucket = "sleeves/rotation-paper"
+label = "Paper · mix 30% · ETF rotation"
+
+[sleeve]
+kind = "rotation"
+
+[risk]
+capital = 30000                  # owner, 2026-10-26: "another $100k in my paper portfolio", split 20-30-25-25
+max_order_value = 31000          # moving the whole bucket into T-bills is one order of about its capital
+max_drawdown_halt = 0.30
+
+[broker]
+ibkr_client_id = 21               # its own API client, never shared with another bucket's runs

@@ -11,7 +11,7 @@ import os
 
 import pandas as pd
 import pytest
-from dashboard_fixture import write_profile, write_state
+from dashboard_fixture import write_bucket, write_profile, write_state
 
 from tqqq_blend.dashboard import build
 
@@ -236,4 +236,53 @@ def test_reconcile_status_shows_as_an_alert(browser, tmp_path, status, level):
         assert alerts.count() == 0 or "reconcile" not in alerts.inner_text()
     else:
         assert "reconcile" in alerts.inner_text() and status in alerts.inner_text()
+    page.close()
+
+
+@pytest.fixture(scope="module")
+def mixed_url(tmp_path_factory):
+    tmp = tmp_path_factory.mktemp("mixed")
+    write_state(tmp / "mix", capital=20_000.0)
+    write_bucket(tmp / "rot", "rotation", 30_000.0)
+    write_bucket(tmp / "sec", "sectors", 25_000.0, start="2026-10-01", seed=12)
+    profile = write_profile(tmp / "mix.toml", "config.aws-paper-mix.toml", tmp / "mix")
+    dirs = [str(tmp / d) for d in ("mix", "rot", "sec")]
+    now = pd.Timestamp("2026-10-20 17:00", tz="America/New_York")
+    return build([str(profile)], tmp / "out", now=now, buckets=dirs[1:], portfolios=[["Mix portfolio", *dirs]]).as_uri()
+
+
+def test_portfolio_and_holdings_buckets_render(browser, mixed_url):
+    page, errors = open_page(browser, mixed_url, now="2026-10-20 18:00", viewport={"width": 1300, "height": 900})
+    assert errors == []
+    folio = page.locator(".portfolio")
+    assert folio.count() == 1 and "Mix portfolio" in folio.inner_text()
+    assert folio.locator(".kpi.hero .v").inner_text().startswith("$")
+    rows = folio.locator("table tbody tr")
+    assert rows.count() == 3 and "Paper · mix 20%" in rows.nth(0).inner_text()
+    assert folio.locator(".chart svg path").count() > 2
+    buckets = page.locator('.account[data-kind="holdings"]')
+    assert buckets.count() == 2
+    rot = buckets.first
+    assert "GLD" in rot.locator('[aria-label="Holdings"]').inner_text()
+    decision = rot.locator(".decision").inner_text()
+    assert "Top 4 eligible" in decision and "not eligible (below trend)" in decision and "market on close" in decision
+    rot.locator('[aria-label="Holdings"] table').wait_for()
+    page.locator(".portfolio table a").nth(1).click()  # the allocation table links to the bucket
+    assert page.evaluate("location.hash") == "#" + rot.get_attribute("id")
+    assert page.locator(".ov").count() == 3
+    page.close()
+
+
+def test_portfolio_fits_a_phone(browser, mixed_url):
+    page, errors = open_page(browser, mixed_url, viewport={"width": 390, "height": 844})
+    assert errors == []
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+    page.close()
+
+
+def test_portfolio_in_dark_mode(browser, mixed_url):
+    page, errors = open_page(browser, mixed_url, color_scheme="dark", viewport={"width": 1300, "height": 900})
+    assert errors == []
+    bg = page.evaluate("getComputedStyle(document.querySelector('.portfolio .kpi')).backgroundColor")
+    assert bg not in ("rgb(255, 255, 255)", "rgba(0, 0, 0, 0)")
     page.close()

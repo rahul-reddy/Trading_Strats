@@ -180,3 +180,78 @@ def write_profile(path: Path, base: str, state_dir: Path, **broker: object) -> P
         lines += [f"{k} = {json.dumps(v)}" for k, v in broker.items()]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
+
+
+def write_bucket(
+    state_dir: Path,
+    kind: str = "rotation",
+    capital: float = 30_000.0,
+    start: str = "2026-09-01",
+    end: str = "2026-10-20",
+    seed: int = 11,
+) -> list[dict]:
+    """State files shaped like sleeves/runner.py writes them: bucket.json, a daily valuation run, and a
+    month-end decision with reasons and orders."""
+    rng = random.Random(seed)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "bucket.json").write_text(
+        json.dumps(
+            {
+                "strategy": "sleeves",
+                "kind": kind,
+                "name": "ETF rotation",
+                "label": f"Paper · mix · {kind}",
+                "bucket": f"sleeves/{kind}-paper",
+                "account_group": "ibkr-paper",
+                "mode": "paper",
+                "capital": capital,
+                "halt_drawdown": 0.30,
+                "benchmark": "SPY",
+                "cash_symbol": "SGOV",
+                "rebalance_band": 0.02,
+            }
+        )
+    )
+    spy, gld = 700.0, 300.0
+    positions: dict[str, int] = {}
+    cash, peak = capital, capital
+    runs, trades = [], []
+    for day in trading_days(start, end):
+        spy *= 1 + rng.gauss(0.0005, 0.01)
+        gld *= 1 + rng.gauss(0.0003, 0.012)
+        prices = {"SPY": spy, "GLD": gld, "SGOV": 100.0}
+        ts = f"{day.date()}T15:34:10"
+        equity = cash + sum(q * prices[s] for s, q in positions.items())
+        peak = max(peak, equity)
+        rec: dict = {"ts": ts, "bucket": f"sleeves/{kind}-paper", "kind": kind, "equity": equity, "peak": peak}
+        rec |= {"cash": cash, "positions": dict(positions), "benchmark_price": spy, "prices": prices}
+        rec |= {"schedule": "next month-end check on 2026-10-30", "orders": [], "status": "hold"}
+        if str(day.date()) == "2026-09-30":
+            orders = [{"symbol": "GLD", "side": "BUY", "quantity": 40, "order_type": "MOC"}]
+            orders.append({"symbol": "SGOV", "side": "BUY", "quantity": 150, "order_type": "MOC"})
+            rec |= {"schedule": "month-end check (2026-09-30)", "orders": orders, "status": "executed"}
+            rec["why"] = {
+                "summary": "Top 4 eligible: GLD; 3 slot(s) in T-bills",
+                "decision": "rebalance to the targets",
+                "reasons": [
+                    {"symbol": "SGOV", "weight": 0.75, "text": "3 empty slot(s): T-bills"},
+                    {"symbol": "GLD", "weight": 0.25, "text": "rank 1, score +8.0%: held at 25%"},
+                    {"symbol": "TLT", "weight": 0.0, "text": "rank 2, score -1.0%: not eligible (below trend)"},
+                ],
+            }
+            for o in orders:
+                positions[o["symbol"]] = o["quantity"]
+                cash -= o["quantity"] * prices[o["symbol"]]
+                trades.append({"ts": ts, "broker": "ibkr", "symbol": o["symbol"], "side": "BUY", "qty": o["quantity"]})
+                trades[-1] |= {"type": "MOC", "ref_price": prices[o["symbol"]], "result": "ibkr#1 Submitted"}
+        runs.append(rec)
+    with open(state_dir / "runs.jsonl", "w", encoding="utf-8") as f:
+        for rec in runs:
+            f.write(json.dumps(rec) + "\n")
+    if trades:
+        with open(state_dir / "trades.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(trades[0]))
+            w.writeheader()
+            w.writerows(trades)
+    (state_dir / "state.json").write_text(json.dumps({"positions": positions, "strategy_cash": cash}))
+    return runs
