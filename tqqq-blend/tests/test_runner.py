@@ -282,3 +282,18 @@ def test_state_is_saved_atomically(tmp_path):
     store.save()
     assert json.loads((tmp_path / "b" / "state.json").read_text())["positions"] == {"TQQQ": 1}
     assert not list((tmp_path / "b").glob("*.tmp"))
+
+
+def test_a_reconcile_that_cannot_connect_is_recorded(tmp_path, market, monkeypatch):
+    cfg = bucket(tmp_path, "paper", 100_000)
+    runner.run_once(cfg, live=True)
+
+    class Down(FakeBroker):
+        def connect(self):
+            raise ConnectionError("gateway not logged in")
+
+    monkeypatch.setattr(runner, "make_broker", lambda cfg: Down(market["account"]))
+    rec = runner.reconcile(cfg)
+    assert rec["status"] == "error: gateway not logged in"
+    last = (Path(cfg.state_dir) / "reconcile.jsonl").read_text().splitlines()[-1]
+    assert json.loads(last)["status"] == "error: gateway not logged in"

@@ -294,11 +294,11 @@ def reconcile(cfg: Config) -> dict:
     after_close = mtc is not None and mtc < 0
     today = pd.Timestamp.now(tz="America/New_York").date()
     broker = make_broker(cfg)
-    if isinstance(broker, IBKRBroker):
-        broker.connect(readonly=True, client_id=cfg.broker.ibkr_client_id + 200)
-    else:
-        broker.connect()
-    try:
+    try:  # a failed connection is recorded too, so the dashboard shows it the same evening
+        if isinstance(broker, IBKRBroker):
+            broker.connect(readonly=True, client_id=cfg.broker.ibkr_client_id + 200)
+        else:
+            broker.connect()
         rec |= settle_fills(store, broker.fills(cfg.bucket), today, after_close)
         left = store.data.get("pending_orders", [])
         rec["pending"] = len(left)
