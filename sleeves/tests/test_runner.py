@@ -230,3 +230,12 @@ def test_a_run_that_cannot_connect_is_recorded(tmp_path, market, monkeypatch):
     assert runner.run_once(cfg, live=True)["status"] == "error: gateway not logged in"
     last = (Path(cfg.state_dir) / "runs.jsonl").read_text().splitlines()[-1]
     assert json.loads(last)["status"] == "error: gateway not logged in"
+
+
+def test_a_broker_without_fill_reports_sends_nothing(tmp_path, market, monkeypatch):
+    class NoFills(FakeBroker):
+        reports_fills = False
+
+    monkeypatch.setattr(runner, "make_broker", lambda c: NoFills(market["account"], market["day"]))
+    rec = runner.run_once(bucket(tmp_path), live=True)
+    assert "can't report fills" in rec["status"] and not market["account"].queued

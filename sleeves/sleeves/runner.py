@@ -183,6 +183,8 @@ def run_once(cfg: Config, live: bool = False, force: bool = False, check_now: bo
     broker = make_broker(cfg)
     try:  # a failed connection is a recorded error too, so the dashboard shows it
         broker.connect()
+        if not getattr(broker, "reports_fills", False):
+            raise ledger.LedgerError(f"{broker.name} can't report fills, so this bucket's shares can't be tracked")
         data = store.data
         data["bucket"], data["account_group"] = cfg.bucket, cfg.account_group
         if "positions" not in data:  # a new bucket: its capital in cash, no shares
@@ -261,7 +263,9 @@ def run_once(cfg: Config, live: bool = False, force: bool = False, check_now: bo
                 },
             )
             log.info("%s %s %d %s -> %s", o.side, o.symbol, o.quantity, o.order_type, result)
-        if armed and orders:  # market orders (and the local paper broker) fill at once: credit them now
+        # Market orders (and the local paper broker) fill at once: credit them now. MOC orders fill at the
+        # close and are credited by the post-close reconcile.
+        if armed and any(o.order_type == "MKT" for o in orders) or (armed and orders and cfg.broker.name == "paper"):
             settle_fills(store, broker.fills(cfg.bucket), today, after_close=False)
         if armed:
             data["last_completed_run"] = today_str

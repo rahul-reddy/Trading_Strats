@@ -14,6 +14,7 @@ from .base import Fill, Order
 
 class PaperBroker:
     name = "paper"
+    reports_fills = True  # fills() works, so bucket ledgers can track this broker's orders
 
     def __init__(self, cfg):
         self.path = Path(cfg.state_dir) / "paper_account.json"

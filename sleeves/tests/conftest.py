@@ -62,6 +62,7 @@ class Account:
 
 class FakeBroker:
     name = "ibkr"
+    reports_fills = True
 
     def __init__(self, account, day):
         self.account, self.day = account, day
