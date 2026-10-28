@@ -10,9 +10,12 @@ from tqqq_blend.config import Config
 
 
 class StubIB:
-    def __init__(self, executions):
+    def __init__(self, executions, session_fills=(), arrive_after=None):
         self.executions = executions
+        self.session_fills = list(session_fills)
+        self.arrive_after = arrive_after or {}  # exec_id -> (sleeps before its report arrives, commission)
         self.placed = []
+        self.sleeps = 0
 
     def placeOrder(self, contract, order):  # noqa: N802 - ib_async's name
         self.placed.append(order)
@@ -22,7 +25,14 @@ class StubIB:
         return self.executions
 
     def sleep(self, s):
-        pass
+        self.sleeps += 1
+        for f in self.executions:
+            n, fee = self.arrive_after.get(f.execution.execId, (None, None))
+            if n is not None and self.sleeps >= n:
+                f.commissionReport = NS(execId=f.execution.execId, commission=fee)
+
+    def fills(self):
+        return self.session_fills
 
     def managedAccounts(self):  # noqa: N802
         return ["DU0000000"]
@@ -31,7 +41,8 @@ class StubIB:
 def execution(exec_id, ref, symbol, side, shares, price, fee):
     when = datetime(2026, 10, 27, 20, tzinfo=UTC)
     e = NS(execId=exec_id, orderRef=ref, side=side, shares=shares, price=price, time=when)
-    return NS(contract=NS(symbol=symbol), execution=e, commissionReport=NS(commission=fee) if fee is not None else None)
+    report = NS(execId=exec_id, commission=fee) if fee is not None else NS(execId="", commission=0.0)
+    return NS(contract=NS(symbol=symbol), execution=e, commissionReport=report)
 
 
 def broker(ib):
@@ -62,3 +73,24 @@ def test_fills_returns_only_this_buckets_executions():
         ("e3", "SQQQ", -3, 20.0, 0.0),
     ]
     assert got[0].time.startswith("2026-10-27T20:00")
+
+
+def test_a_commission_report_that_arrives_late_is_waited_for():
+    late = execution("e1", "b", "TQQQ", "BOT", 5, 50.0, None)
+    ib = StubIB([late], arrive_after={"e1": (3, 1.05)})
+    b = broker(ib)
+    [f] = b.fills("b")
+    assert f.commission == 1.05 and b.commission_missing == 0 and ib.sleeps == 3
+
+
+def test_a_report_on_the_sessions_copy_is_used():
+    fill = execution("e1", "b", "TQQQ", "BOT", 5, 50.0, None)
+    session = execution("e1", "b", "TQQQ", "BOT", 5, 50.0, 0.85)
+    [f] = broker(StubIB([fill], session_fills=[session])).fills("b")
+    assert f.commission == 0.85
+
+
+def test_a_missing_commission_is_counted_not_hidden():
+    b = broker(StubIB([execution("e1", "b", "TQQQ", "BOT", 5, 50.0, None)]))
+    [f] = b.fills("b")
+    assert f.commission == 0.0 and b.commission_missing == 1

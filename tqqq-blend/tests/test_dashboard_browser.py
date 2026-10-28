@@ -269,7 +269,8 @@ def test_portfolio_and_holdings_buckets_render(browser, mixed_url):
     rot.locator('[aria-label="Holdings"] table').wait_for()
     page.locator(".portfolio table a").nth(1).click()  # the allocation table links to the bucket
     assert page.evaluate("location.hash") == "#" + rot.get_attribute("id")
-    assert page.locator(".ov").count() == 3
+    assert page.locator(".ov").count() == 4  # the portfolio card first, then each account
+    assert "Mix portfolio" in page.locator(".ov").first.inner_text()
     page.close()
 
 

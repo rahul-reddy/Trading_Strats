@@ -30,6 +30,7 @@ class IBKRBroker:
         self.ib = None
         self.account_type = None
         self._contracts = {}
+        self.commission_missing = 0  # fills() whose commission report never arrived
 
     def connect(self, readonly: bool = False, client_id: int | None = None):
         from ib_async import IB
@@ -113,18 +114,32 @@ class IBKRBroker:
 
     def fills(self, ref: str) -> list[Fill]:
         """Today's executions for this account that carry `ref` (IB returns the current day's executions).
-        Commission reports arrive after the execution, so this waits briefly for them; a commission that
-        still hasn't arrived counts as 0 and the fill says so in its `commission` being exactly 0."""
+        Commission reports arrive separately, after their executions, so this waits up to about 5 seconds for
+        them. One still missing counts as 0 and is counted in `commission_missing`, which the reconcile records."""
         from ib_async import ExecutionFilter
 
-        found = self.ib.reqExecutions(ExecutionFilter(acctCode=self._account()))
-        self.ib.sleep(1)
+        found = [
+            f for f in self.ib.reqExecutions(ExecutionFilter(acctCode=self._account())) if f.execution.orderRef == ref
+        ]
+
+        def reported(f) -> bool:
+            c = f.commissionReport
+            return bool(c and c.execId == f.execution.execId)
+
+        for _ in range(10):
+            if all(reported(f) for f in found):
+                break
+            self.ib.sleep(0.5)
+        later = {f.execution.execId: f for f in self.ib.fills()}  # reports that attached to the session's copy
         out = []
+        self.commission_missing = 0
         for f in found:
             e = f.execution
-            if e.orderRef != ref:
-                continue
-            fee = f.commissionReport.commission if f.commissionReport else 0.0
+            src = f if reported(f) else later.get(e.execId, f)
+            fee = src.commissionReport.commission if reported(src) else None
+            if fee is None or not math.isfinite(fee):
+                self.commission_missing += 1
+                fee = 0.0
             out.append(
                 Fill(
                     exec_id=e.execId,
@@ -132,7 +147,7 @@ class IBKRBroker:
                     symbol=f.contract.symbol,
                     shares=int(e.shares) if e.side == "BOT" else -int(e.shares),
                     price=float(e.price),
-                    commission=float(fee) if fee is not None and math.isfinite(fee) else 0.0,
+                    commission=float(fee),
                     time=e.time.isoformat() if hasattr(e.time, "isoformat") else str(e.time),
                 )
             )

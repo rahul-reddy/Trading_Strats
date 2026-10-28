@@ -29,6 +29,14 @@ dry-run "Latest decision" on their dashboard cards until then.
 
 ## History
 
+- 2026-10-28: Post-deploy check of 2026-10-27: every bucket ran; the mix bucket's first order (BUY 46 TQQQ MOC)
+  filled at $70.99 and the 16:10 reconcile credited it; the dashboard published (401 without the password, no
+  script errors, no phone overflow). Fixes (fix/dashboard-polish-commissions): IBKR commission reports were missed
+  (booked $0; now waited for, and a missing one is flagged in the reconcile); the chart day point prefers the
+  near-close run over a forced evening test run; the Trades KPI counts only orders sent; flat drawdowns get a
+  0..-5% axis; dollar ticks get decimals on narrow ranges; a portfolio card leads the overview; server paths and
+  URL tokens are kept off the published page. pip-audit: no known vulnerabilities in either project.
+
 - 2026-10-26: Buckets (#20). The owner asked for a second $100k paper portfolio, 20/30/25/25 across tqqq-blend,
   ETF rotation, sector momentum and quality-value, each slice tested as its own bucket and shown on the dashboard.
   Research behind the sleeves: 19-year ETF backtests and CRSP factor data (sleeves/STRATEGY.md). Gemini's review
