@@ -316,6 +316,10 @@ def reconcile(cfg: Config) -> dict:
         rec["status"] = "reconciled" + (f", {len(left)} still pending" if left else "")
         if rec["short_fills"]:
             rec["status"] += f", {len(rec['short_fills'])} order(s) filled short"
+        missing = getattr(broker, "commission_missing", 0)
+        if missing:  # booked at $0: the bucket's cash is that much too high until someone corrects it
+            rec["commission_missing"] = missing
+            rec["status"] += f", commission not reported for {missing} fill(s)"
     except Exception as e:  # noqa: BLE001 - recorded; the next run refuses to trade on unmatched orders
         rec["status"] = f"error: {e}"
         log.exception("reconcile failed")

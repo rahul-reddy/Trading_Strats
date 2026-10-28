@@ -34,13 +34,17 @@ RECENT_TRADES = 50
 # IBKR account IDs (U1234567, DU1234567, DF...) can appear in broker error messages. The page is
 # password-protected, but account numbers never belong on it.
 _ACCOUNT_ID = re.compile(r"\b(?:D[A-Z]?|U)\d{5,}\b")
+# A data-source token in a URL (Finviz takes it as auth=...). Errors are recorded verbatim, so one quoting a
+# request URL could otherwise carry the token onto the page.
+_TOKEN = re.compile(r"(auth|token|apikey|api_key)=[^&\s\"']+", re.I)
+WINDOW_MINUTES = 60  # a run within this many minutes of the close is a scheduled one
 
 
 def scrub(value: Any) -> Any:
     """Recursively replace anything shaped like an IBKR account ID, and NaN/inf (which runs.jsonl can
     hold but JSON can't) with None."""
     if isinstance(value, str):
-        return _ACCOUNT_ID.sub("[account]", value)
+        return _TOKEN.sub(r"\1=[redacted]", _ACCOUNT_ID.sub("[account]", value))
     if isinstance(value, float) and not math.isfinite(value):
         return None
     if isinstance(value, dict):
@@ -82,6 +86,27 @@ def last_reconcile(state_dir: Path) -> dict | None:
         if isinstance(rec, dict):
             return rec
     return None
+
+
+def day_points(runs: list[dict]) -> dict[str, dict]:
+    """One run per day for the charts: the last one that valued the account, preferring a scheduled near-close
+    run, so a forced test run in the evening doesn't replace that day's close-time point."""
+    best: dict[str, dict] = {}
+    for r in runs:
+        if _num(r.get("equity")) is None:
+            continue
+        day = r["ts"][:10]
+        mtc = _num(r.get("minutes_to_close"))
+        in_window = mtc is not None and 0 <= mtc <= WINDOW_MINUTES
+        prev = best.get(day)
+        if prev is None or in_window or not prev["_in_window"]:
+            best[day] = r | {"_in_window": in_window}
+    return {d: {k: v for k, v in r.items() if k != "_in_window"} for d, r in best.items()}
+
+
+def sent(trades: list[dict]) -> int:
+    """Orders actually sent (trades.csv also records the orders a dry run would have placed)."""
+    return sum(1 for t in trades if t.get("result") and t["result"] != "DRY-RUN")
 
 
 def read_trades(state_dir: Path) -> list[dict]:
@@ -177,11 +202,8 @@ def summarize_profile(cfg: Config, now: pd.Timestamp) -> dict:
     if not runs:
         return scrub(account | {"series": [], "runs": [], "trades": [], "missed_days": [], "metrics": None})
 
-    # One point per day: the last run of the day that got as far as valuing the account.
-    by_day: dict[str, dict] = {}
-    for r in runs:
-        if _num(r.get("equity")) is not None:
-            by_day[r["ts"][:10]] = r
+    # One point per day (day_points): the last run of the day that valued the account, near the close if any.
+    by_day = day_points(runs)
     series: list[dict[str, Any]] = [
         {
             "date": d,
@@ -220,6 +242,7 @@ def summarize_profile(cfg: Config, now: pd.Timestamp) -> dict:
         "metrics": metrics,
         "decision": decision,
         "trades": [trade_reason(t, by_ts) for t in reversed(trades[-RECENT_TRADES:])],
+        "trades_sent": sent(trades),
         "trades_total": len(trades),
     }
     return scrub(account)
@@ -266,10 +289,7 @@ def summarize_bucket(state_dir: Path, now: pd.Timestamp) -> dict:
     }
     if not runs:
         return scrub(account | {"series": [], "runs": [], "trades": [], "missed_days": [], "metrics": None})
-    by_day: dict[str, dict] = {}
-    for r in runs:
-        if _num(r.get("equity")) is not None:
-            by_day[r["ts"][:10]] = r
+    by_day = day_points(runs)
     series: list[dict[str, Any]] = [
         {"date": d, "equity": _num(r["equity"]), "peak": _num(r.get("peak")), "bench": _num(r.get("benchmark_price"))}
         for d, r in sorted(by_day.items())
@@ -309,6 +329,7 @@ def summarize_bucket(state_dir: Path, now: pd.Timestamp) -> dict:
         "next_check": runs[-1].get("schedule"),
         "trades": list(reversed(trades[-RECENT_TRADES:])),
         "trades_total": len(trades),
+        "trades_sent": sent(trades),
     }
     return scrub(account)
 
@@ -391,6 +412,8 @@ def build(
         folio = portfolio(name, [a for a in found if a is not None])
         folio["missing"] = [d for d, a in zip(dirs, found, strict=True) if a is None]  # named, never dropped
         folios.append(scrub(folio))
+    for a in by_dir.values():  # server paths are only needed to match portfolio members; don't publish them
+        a.pop("state_dir", None)
     data = {"generated": now.isoformat(timespec="seconds"), "portfolios": folios, "strategies": strategies}
     # No "<" at all inside the JSON (< decodes to the same text), so no recorded string can close the
     # <script> element or open a comment that changes how the browser parses it.

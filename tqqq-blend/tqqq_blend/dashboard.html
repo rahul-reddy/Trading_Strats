@@ -145,6 +145,7 @@ a.ov:hover { border-color: var(--axis); transform: translateY(-1px); }
 .kpis { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
 .kpis.k4 { grid-template-columns: 1.6fr repeat(3, 1fr); }
 .portfolio { margin-bottom: 36px; scroll-margin-top: 16px; }
+.portfolio .grid-main > section { align-self: start; }  /* the allocation table keeps its own height */
 .reasons { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
 .reasons li { display: grid; grid-template-columns: 64px 44px 1fr; gap: 8px; align-items: baseline; }
 .reasons .sym { font-weight: 650; }
@@ -402,7 +403,7 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
     // trade on orders it could not match, so a failed or unfinished one needs a look the same evening.
     const rc = a.reconcile, rcs = rc ? String(rc.status || "") : "";
     if (rcs.startsWith("error")) alerts.push(["critical", "Post-close reconcile failed (" + fmtTime(rc.ts) + "): " + rcs]);
-    else if (/still pending|filled short/.test(rcs)) alerts.push(["warning", "Post-close reconcile (" + fmtTime(rc.ts) + "): " + rcs + "."]);
+    else if (/still pending|filled short|commission not reported/.test(rcs)) alerts.push(["warning", "Post-close reconcile (" + fmtTime(rc.ts) + "): " + rcs + "."]);
     if (a.errors_30d && !lastFailed) notes.push(a.errors_30d + " failed run(s) in the last 30 days, since recovered.");
     let level = "good", label = "Healthy";
     if (!a.runs_total) { level = "info"; label = "No runs yet"; }
@@ -482,6 +483,10 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
     if (!opts.zero || lo < 0) lo -= pad;
     if (!opts.zero || hi > 0) hi += pad;
     if (opts.clampMax != null) hi = Math.min(hi, opts.clampMax);
+    if (opts.minSpan && hi - lo < opts.minSpan) {  // e.g. no drawdown yet: show 0 to -5%, not 0 to -100%
+      if (opts.clampMax != null) lo = hi - opts.minSpan;
+      else { const mid = (hi + lo) / 2; lo = mid - opts.minSpan / 2; hi = mid + opts.minSpan / 2; }
+    }
     // the axis runs from one round tick to the next, so the top and bottom of the plot are labelled
     let ticks = niceTicks(lo, hi, opts.height && opts.height < 200 ? 3 : 4);
     if (opts.clampMax != null) ticks = ticks.filter(function (t) { return t <= opts.clampMax + 1e-9; });
@@ -497,7 +502,7 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
     ticks.forEach(function (t) {
       grid.append(svg("line", { x1: M.l, x2: W - M.r, y1: y(t), y2: y(t) }));
       const tx = svg("text", { x: M.l - 8, y: y(t) + 4, "text-anchor": "end" });
-      tx.textContent = opts.yFmt(t);
+      tx.textContent = opts.yFmt(t, ticks.length > 1 ? ticks[1] - ticks[0] : 1);
       axis.append(tx);
     });
     const xt = Math.min(W < 420 ? 3 : 5, n);
@@ -620,6 +625,13 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
     });
   }
 
+  // "$" axis labels with enough decimals that neighbouring ticks never read the same
+  function dollarTick(v, step) {
+    if (!isNum(v)) return "—";
+    const dp = step >= 1 ? 0 : step >= 0.1 ? 1 : 2;
+    return "$" + v.toFixed(dp);
+  }
+
   function legend(items) {
     return el("div", { class: "chart-legend" }, items.map(function (it) {
       const k = el("i", { class: it.line ? "line" : "" }); k.style.background = it.color;
@@ -697,8 +709,12 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
       kpi(a.symbols.signal + " buy and hold", pct(m.qqq_return, 2, true), vs(m.qqq_return)),
       kpi(a.symbols.long + " buy and hold", pct(m.long_return, 2, true), vs(m.long_return)),
       kpi("Drawdown from peak", pct(m.drawdown, 1), "Worst " + pct(m.max_drawdown, 1) + " · halts at " + pct(-a.halt_drawdown, 0), meter),
-      kpi("Trades", String(a.trades_total || 0), m.days + " trading days · " + a.runs_total + " runs"),
+      kpi("Trades", String(a.trades_sent || 0), tradesNote(a, m)),
     ]);
+  }
+  function tradesNote(a, m) {
+    const dry = (a.trades_total || 0) - (a.trades_sent || 0);
+    return m.days + " trading days · " + a.runs_total + " runs" + (dry > 0 ? " · " + dry + " dry-run order(s) not sent" : "");
   }
 
   // ---- decision panel ----
@@ -873,9 +889,9 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
           { name: sym.signal + " buy and hold", short: sym.signal, color: "var(--series-2)", values: idx("qqq") },
           { name: sym.long + " buy and hold", short: sym.long, color: "var(--series-3)", values: idx("long_px") },
         ],
-        yFmt: function (v) { return isNum(v) ? "$" + v.toFixed(0) : "—"; },
+        yFmt: dollarTick,
         tipFmt: function (v) { return isNum(v) ? "$" + v.toFixed(2) : "—"; } },
-      drawdown: { label: "Strategy drawdown from its peak", dates: dates, height: 170, zero: true, clampMax: 0,
+      drawdown: { label: "Strategy drawdown from its peak", dates: dates, height: 170, zero: true, clampMax: 0, minSpan: 0.05,
         series: [{ name: "Drawdown", color: "var(--series-1)", values: ddAll.slice(start), area: true }],
         refLine: { y: -a.halt_drawdown, label: "Halt " + pct(-a.halt_drawdown, 0) },
         yFmt: function (v) { return pct(v, 0); }, tipFmt: function (v) { return pct(v, 1); } },
@@ -961,11 +977,13 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
     const tabs = [
       ["Runs", runs.length + (a.runs_total > runs.length ? " of " + a.runs_total : ""), function () {
         return runs.length ? limited(runs, function (rows) {
-          return table([["When", "when"], ["Status", "wide"], ["Net", "num opt"], ["Equity", "num"], ["Orders", "num opt"], ["Quotes", "opt"]],
-            rows.map(function (r) {
-              return [fmtTime(r.ts), el("span", { class: "status" }, [statusDot(r.status), el("span", { text: String(r.status || "—") })]),
-                num(r.net, 2), money(r.equity), r.orders ? String(r.orders.length) : "—", r.quote_source ? String(r.quote_source) : "—"];
-            }));
+          const holdings = a.kind === "holdings";
+          const head = [["When", "when"], ["Status", "wide"]].concat(holdings ? [] : [["Net", "num opt"]], [["Equity", "num"], ["Orders", "num opt"], ["Quotes", "opt"]]);
+          return table(head, rows.map(function (r) {
+            const status = el("span", { class: "status" }, [statusDot(r.status), el("span", { text: String(r.status || "—") })]);
+            const rest = [money(r.equity), r.orders ? String(r.orders.length) : "—", r.quote_source ? String(r.quote_source) : "—"];
+            return [fmtTime(r.ts), status].concat(holdings ? [] : [num(r.net, 2)], rest);
+          }));
         })
           : el("div", { class: "empty", text: "No runs recorded." });
       }],
@@ -1068,7 +1086,7 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
       ]),
       kpi(b + " buy and hold", pct(m.bench_return, 2, true), vsText(m.return, m.bench_return)),
       kpi("Drawdown from peak", pct(m.drawdown, 1), "Worst " + pct(m.max_drawdown, 1) + (a.halt_drawdown ? " · halts at " + pct(-a.halt_drawdown, 0) : ""), meterFor(m.drawdown, a.halt_drawdown)),
-      kpi("Trades", String(a.trades_total || 0), m.days + " trading days · " + a.runs_total + " runs"),
+      kpi("Trades", String(a.trades_sent || 0), tradesNote(a, m)),
     ]);
   }
   function growthAndDrawdown(ser, benchName, halt, label) {
@@ -1082,8 +1100,8 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
     const growth = chart({ label: "Growth of $100", dates: dates, baseline: 100, endLabels: true, height: 240,
       series: [{ name: label, short: label, color: "var(--series-1)", values: idx("equity") },
                { name: benchName + " buy and hold", short: benchName, color: "var(--series-2)", values: idx("bench") }],
-      yFmt: function (v) { return isNum(v) ? "$" + v.toFixed(0) : "—"; }, tipFmt: function (v) { return isNum(v) ? "$" + v.toFixed(2) : "—"; } });
-    const ddOpts = { label: "Drawdown from peak", dates: dates, height: 150, zero: true, clampMax: 0,
+      yFmt: dollarTick, tipFmt: function (v) { return isNum(v) ? "$" + v.toFixed(2) : "—"; } });
+    const ddOpts = { label: "Drawdown from peak", dates: dates, height: 150, zero: true, clampMax: 0, minSpan: 0.05,
       series: [{ name: "Drawdown", color: "var(--series-1)", values: dd, area: true }],
       yFmt: function (v) { return pct(v, 0); }, tipFmt: function (v) { return pct(v, 1); } };
     if (halt) ddOpts.refLine = { y: -halt, label: "Halt " + pct(-halt, 0) };
@@ -1203,6 +1221,18 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
   const stale = staleBanner();
   if (stale) document.getElementById("stale").append(stale);
   const app = document.getElementById("app"), overview = document.getElementById("overview");
+  (DATA.portfolios || []).forEach(function (p, i) {
+    const m = p.metrics, card = el("a", { class: "ov", href: "#portfolio-" + i });
+    card.append(el("div", { class: "ov-head" }, [el("span", { class: "ov-name", text: p.name }), el("span", { class: "badge", text: p.members.length + " buckets" })]));
+    if (m) {
+      card.append(el("div", { class: "ov-value", text: money(m.equity) }));
+      card.append(el("div", { class: "ov-line" }, [
+        el("span", null, [el("span", { text: "Since start " }), el("b", { class: dirClass(m.return), text: pct(m.return, 2, true) })]),
+        el("span", null, [el("span", { text: "SPY " }), el("b", { class: dirClass(m.bench_return), text: pct(m.bench_return, 2, true) })]),
+      ]));
+    } else card.append(el("div", { class: "ov-empty", text: "None of its buckets has run yet." }));
+    overview.append(card);
+  });
   if ((DATA.portfolios || []).length) app.append(el("h2", { class: "strategy-title", text: "Portfolios" }));
   (DATA.portfolios || []).forEach(function (p, i) { app.append(portfolioSection(p, i)); });
   DATA.strategies.forEach(function (strat, si) {

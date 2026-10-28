@@ -214,3 +214,32 @@ def test_portfolio_sums_its_buckets_and_names_missing_ones(mixed):
     assert p["series"][0]["date"] < "2026-10-01"  # the sectors bucket counts at its capital before its first run
     assert p["metrics"]["return"] == pytest.approx(p["series"][-1]["equity"] / 75_000 - 1)
     assert sum(m["weight"] for m in p["members"]) == pytest.approx(1.0)
+
+
+def test_a_forced_evening_run_does_not_replace_the_close_time_point():
+    from tqqq_blend.dashboard import day_points
+
+    runs = [
+        {"ts": "2026-10-26T15:30:07", "equity": 100_870.0, "minutes_to_close": 29.9},
+        {"ts": "2026-10-26T21:44:40", "equity": 100_802.0, "minutes_to_close": -344.0},
+        {"ts": "2026-10-27T21:00:00", "equity": 101_000.0, "minutes_to_close": None},  # no scheduled run that day
+    ]
+    pts = day_points(runs)
+    assert pts["2026-10-26"]["equity"] == 100_870.0 and pts["2026-10-27"]["equity"] == 101_000.0
+
+
+def test_trades_count_only_orders_sent_and_paths_and_tokens_stay_off_the_page(tmp_path):
+    write_state(tmp_path / "paper")
+    with open(tmp_path / "paper" / "trades.csv", "a", encoding="utf-8") as f:
+        f.write("2026-10-20T21:00:00,ibkr,TQQQ,BUY,5,MOC,70,0.5,DRY-RUN\n")
+    with open(tmp_path / "paper" / "runs.jsonl", "a", encoding="utf-8") as f:
+        f.write(
+            json.dumps({"ts": "2026-10-20T21:00:00", "status": "error: GET https://x/export?auth=s3cret&v=1 failed"})
+            + "\n"
+        )
+    profile = write_profile(tmp_path / "p.toml", "config.ibkr-paper.toml", tmp_path / "paper")
+    html = build([str(profile)], tmp_path / "out", now=NOW).read_text(encoding="utf-8")
+    paper = page_data(html)["strategies"][0]["accounts"][0]
+    assert paper["trades_sent"] == paper["trades_total"] - 1
+    assert "s3cret" not in html and "auth=[redacted]" in html
+    assert "state_dir" not in html and str(tmp_path).replace("\\", "/") not in html.replace("\\\\", "/")
