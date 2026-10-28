@@ -219,6 +219,7 @@ def test_order_reason_sits_under_its_order(browser, tmp_path):
     [
         ("error: IB not connected", "Failing"),
         ("reconciled, 1 still pending", "Needs a look"),
+        ("reconciled, commission not reported for 1 fill(s)", "Needs a look"),
         ("reconciled", "Healthy"),
     ],
 )

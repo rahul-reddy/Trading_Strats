@@ -403,7 +403,7 @@ footer { color: var(--muted); font-size: 12.5px; margin-top: 32px; line-height: 
     // trade on orders it could not match, so a failed or unfinished one needs a look the same evening.
     const rc = a.reconcile, rcs = rc ? String(rc.status || "") : "";
     if (rcs.startsWith("error")) alerts.push(["critical", "Post-close reconcile failed (" + fmtTime(rc.ts) + "): " + rcs]);
-    else if (/still pending|filled short/.test(rcs)) alerts.push(["warning", "Post-close reconcile (" + fmtTime(rc.ts) + "): " + rcs + "."]);
+    else if (/still pending|filled short|commission not reported/.test(rcs)) alerts.push(["warning", "Post-close reconcile (" + fmtTime(rc.ts) + "): " + rcs + "."]);
     if (a.errors_30d && !lastFailed) notes.push(a.errors_30d + " failed run(s) in the last 30 days, since recovered.");
     let level = "good", label = "Healthy";
     if (!a.runs_total) { level = "info"; label = "No runs yet"; }
